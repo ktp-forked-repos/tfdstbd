@@ -3,15 +3,7 @@ from __future__ import division
 from __future__ import print_function
 
 import unittest
-
-# if __package__ is None:
-#     import os, sys
-#
-#     sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-#
-#     from tokenizer import WordTokenizer, SubWordTokenizer
-# else:
-from lib.tokenizer import WordTokenizer, SubWordTokenizer
+from .token import WordTokenizer, SubWordTokenizer
 
 
 class TestSubWordTokenizer(unittest.TestCase):
