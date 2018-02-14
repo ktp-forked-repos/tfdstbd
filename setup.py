@@ -12,4 +12,9 @@ setup(name='sentsegm',
       author_email='shkarupa.alex@gmail.com',
       license='MIT',
       packages=['sentsegm'],
+      install_requires=[
+          'nltk',
+          'tensorflow',
+          'repoze.lru'
+      ],
       zip_safe=False)

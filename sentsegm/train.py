@@ -2,52 +2,52 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-if __package__ is None:
-    import os, sys
+import tensorflow as tf
+from .dataset import Trainer
+from .model import model_fn
 
-    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-    from data_loader import TrainDataLoader
-else:
-    from rusentseg.lib import TrainDataLoader
+# https://www.tensorflow.org/api_docs/python/tf/parse_single_sequence_example
+# https://www.tensorflow.org/api_docs/python/tf/contrib/training/bucket_by_sequence_length
+# CompiledWrapper
+# https://www.tensorflow.org/api_guides/python/contrib.seq2seq
 
-data_params = {
-    'data_dir': 'data/',
-    'batch_size': 32,
+# TODO
+# features, corpus https://nlp.stanford.edu/courses/cs224n/2005/agarwal_herndon_shneider_final.pdf
+# http://www.aclweb.org/anthology/C12-2096
+# http://amitavadas.com/Pub/SBD_ICON_2015.pdf
+# http://www.wellformedness.com/blog/simpler-sentence-boundary-detection/ - contain vowel
+# http://www.aclweb.org/anthology/D13-1146
+
+# http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.85.5017&rep=rep1&type=pdf
+
+# TODO http://www.unicode.org/Public/UCD/latest/ucd/UnicodeData.txt
+
+# translit http://userguide.icu-project.org/transforms/general
+
+tf.logging.set_verbosity(tf.logging.DEBUG)
+
+trainer_params = {
+    'data_dir': 'data',
+    # 'data_dir': 'data_s',
+    'batch_size': 20,
     'test_size': 0.2,
-    'max_docsize': 10,
+    'doc_size': 10,
+    'random_seed': 43,
 }
-data_loader = TrainDataLoader(data_params['data_dir'],
-                              batch_size=data_params['batch_size'],
-                              test_size=data_params['test_size'],
-                              max_docsize=data_params['max_docsize'])
+trainer = Trainer(**trainer_params)
 
-# char_rnn = CharRNN()
-# model_params = {
-#     'vocab_size': data_loader.vocab_size(),
-#     'rnn_size': 512,
-#     'num_layers': 3,
-#     'input_keep_prob': 0.8,
-#     'output_keep_prob': 0.8,
-#     'batch_size': data_params['batch_size'],
-#     'seq_length': data_params['seq_length'],
-#     # 'grad_clip': 5.0,
-#     # 'log_dir': 'logs',
-#     'learning_rate': 0.001,
-# }
-# estimator = tf.estimator.Estimator(
-#     model_fn=char_rnn.model_fn,
-#     model_dir='rusentseg',
-#     params=model_params)
-#
-# train_X, test_X, train_y, test_y = data_loader.make_train_and_test_set()
-#
-# train_input_fn, train_input_hook = dataset.get_train_inputs(train_X, train_y)
-# test_input_fn, test_input_hook = dataset.get_test_inputs(test_X, test_y)
-#
-# estimator.train(input_fn=train_input_fn, steps=10000)
+model_params = {
+    'vocab_words': trainer.vocab_words(),
+    'embed_size': 100,
+    'rnn_size': 64,
+}
+estimator = tf.estimator.Estimator(
+    model_fn=model_fn,
+    model_dir='mdl',
+    params=model_params)
 
+estimator.train(input_fn=trainer.train_dataset, steps=500)
+m = estimator.evaluate(input_fn=trainer.test_dataset)
+print(m)
 
-X, y = next(data_loader._test_generator())
-for p in zip(X, y):
-    print(p)
