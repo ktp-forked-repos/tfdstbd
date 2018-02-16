@@ -41,7 +41,7 @@ params['class_weights'] = trainer.train_weights()
 
 estimator = tf.estimator.Estimator(
     model_fn=model_fn,
-    model_dir='../../model',
+    model_dir='../model',
     params=params
 )
 
