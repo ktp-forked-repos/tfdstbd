@@ -5,7 +5,7 @@
 #include "tensorflow/core/framework/op_kernel.h"
 #include "tensorflow/core/framework/shape_inference.h"
 
-#include <unistr.h>
+#include <unicode/unistr.h>
 #include <unicode/normalizer2.h>
 //#include <unicode/schriter.h>
 #include <unicode/locid.h>
