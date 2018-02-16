@@ -15,7 +15,8 @@ trainer_params = {
 }
 trainer = Trainer(**trainer_params)
 
-
+# for z in trainer._test_generator():
+#     print(z)
 
 
 # from collections import Counter

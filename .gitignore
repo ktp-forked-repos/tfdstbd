@@ -102,5 +102,6 @@ ENV/
 
 # this package
 sentsegm/data
+!sentsegm/data/dataset.txt
 .DS_Store
 .idea/

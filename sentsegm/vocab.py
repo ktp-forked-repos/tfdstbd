@@ -3,8 +3,10 @@ from __future__ import division
 from __future__ import print_function
 
 from collections import Counter
-from six.moves import cPickle
+from io import open
 from operator import itemgetter
+from six.moves import cPickle
+
 
 class Vocabulary:
     PAD_TOKEN = '<PAD>'
@@ -31,9 +33,18 @@ class Vocabulary:
 
         return list(result)
 
-    def save(self, filename):
-        with open(filename, 'wb') as fout:
-            cPickle.dump(self._cnt, fout, protocol=2)
+    def save(self, filename, binary=True):
+        if binary:
+            with open(filename, 'wb') as fout:
+                cPickle.dump(self._cnt, fout, protocol=2)
+        else:
+            with open(filename, 'w', encoding='utf-8') as fout:
+                fout.write(u'token\tfrequency\n')
+                for w in self.items():
+                    f = self._cnt[w]
+                    w_safe = w if not w.isspace() else 'space_{}'.format(ord(w))
+                    w_safe = w if len(w_safe) else '<EMPTY>'
+                    fout.write(u'{}\t{}\n'.format(w_safe, f))
 
     @staticmethod
     def load(filename):
