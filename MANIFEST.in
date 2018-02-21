@@ -1,4 +1,1 @@
-include README.rst
 include LICENSE
-include test.sh
-include sentsegm/params

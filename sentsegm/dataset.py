@@ -10,17 +10,9 @@ from operator import itemgetter
 from random import Random
 from functools import partial
 from six.moves import cPickle
-from .ops import split_tokens
-
-try:
-    # Python 2
-    from future_builtins import filter, map
-except ImportError:
-    # Python 3
-    pass
+from tfucops import expand_split_words
 
 from .vocab import Vocabulary
-
 
 PAD_TOKEN = '<PAD>'
 
@@ -79,7 +71,7 @@ class Trainer:
         paragraphs = map(partial(filter, len), paragraphs)  # filter out 0-len sentences
         paragraphs = map(list, paragraphs)  # sentence iterator -> sentence list
         paragraphs = filter(len, paragraphs)  # filter out 0-len paragraphs
-        paragraphs = list(paragraphs) # paragraph iterator -> paragraph list
+        paragraphs = list(paragraphs)  # paragraph iterator -> paragraph list
 
         new_paragraphs = []
         with tf.Session() as sess:
@@ -151,8 +143,8 @@ class Trainer:
 
         tf.logging.info('Creating weights')
         counts = itertools.chain.from_iterable(self._train_data)  # list of paragraphs to list of sentences
-        counts = map(list, counts) # extract token counts from sentence tuple
-        counts = map(len, counts) # extract token counts from sentence tuple
+        counts = map(list, counts)  # extract token counts from sentence tuple
+        counts = map(len, counts)  # extract token counts from sentence tuple
         counts = list(counts)
 
         counts_0 = sum(counts)
@@ -217,6 +209,7 @@ class Trainer:
         )
         dataset = dataset.padded_batch(self.batch_size, padded_shapes=([], [None]))
         # dataset = dataset.map(lambda X, y: ({'document': X}, y))
+        dataset = dataset.repeat(4)
         dataset = dataset.prefetch(4)
 
         return dataset
@@ -228,5 +221,9 @@ class Trainer:
         return self._dataset_generator(self._test_generator)
 
 
-def eval_input_fn(document):
-    pass
+def predict_input_fn(documents, batch_size=1):
+    dataset = tf.data.Dataset.from_tensor_slices(documents)
+    dataset = dataset.map(lambda x: expand_split_words(x, default_value=PAD_TOKEN)) # TODO: parallel
+    dataset = dataset.padded_batch(batch_size, padded_shapes=([None]), padding_values=(PAD_TOKEN))
+
+    return dataset

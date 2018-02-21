@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+from tensorflow.python.framework import ops
 import tensorflow as tf
 
 
@@ -11,38 +12,42 @@ def f1_score(labels, predictions, weights=None, metrics_collections=None, update
             labels,
             predictions,
             weights,
-            metrics_collections,
-            updates_collections,
+            None,
+            None,
             'precision'
         )
         recall_val, recall_upd = tf.metrics.recall(
             labels,
             predictions,
             weights,
-            metrics_collections,
-            updates_collections,
+            None,
+            None,
             'recall'
         )
 
         def compute_f1_score(precision, recall, name):
             with tf.name_scope(name, 'compute', [precision, recall]):
-                return tf.divide(
-                    tf.multiply(
-                        2.,
-                        tf.multiply(precision, recall)
+                return tf.where(
+                    tf.greater(precision + recall, 0),
+                    tf.div(
+                        tf.multiply(
+                            2.,
+                            tf.multiply(precision, recall)
+                        ),
+                        precision + recall
                     ),
-                    tf.add(precision, recall)
-                )
+                    0,
+                    name)
 
         value = compute_f1_score(precision_val, recall_val, 'value')
         update_op = compute_f1_score(precision_upd, recall_upd, 'update_op')
 
         if metrics_collections:
-            tf.add_to_collections(metrics_collections, value)
+            ops.add_to_collections(metrics_collections, value)
             # tf.python.ops.add_to_collections(metrics_collections, value)
 
         if updates_collections:
-            tf.add_to_collections(updates_collections, update_op)
+            ops.add_to_collections(updates_collections, update_op)
             # tf.python.ops.add_to_collections(updates_collections, update_op)
 
         return value, update_op

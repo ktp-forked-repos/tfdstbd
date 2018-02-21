@@ -6,7 +6,7 @@ import os
 import shutil
 import tempfile
 import unittest
-from ..vocab import Vocabulary
+from sentsegm.vocab import Vocabulary
 
 
 class TestVocabulary(unittest.TestCase):

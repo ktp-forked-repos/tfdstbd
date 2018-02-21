@@ -4,7 +4,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from ..ops import split_tokens, extract_features
+from ..ops import split_words, extract_features
 
 
 class ExtractFeaturesTest(tf.test.TestCase):

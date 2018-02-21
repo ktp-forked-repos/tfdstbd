@@ -11,9 +11,10 @@ endif
 
 all:
 	g++ -std=c++11 -shared sentsegm/ops/ops.cc -o sentsegm/ops/ops.so -fPIC $(TF_CFLAGS) $(TF_LFLAGS) -O2 $(OS_FLAGS) $(ICU_FLAGS)
-	hash python 2>/dev/null && echo "Test with default Python" && python -m sentsegm.test.ops
-	hash python2 2>/dev/null && echo "Test with Python v2" && python2 -m sentsegm.test.ops
-	hash python3 2>/dev/null && echo "Test with Python v3" && python3 -m sentsegm.test.ops
+	# hash python 2>/dev/null && echo "Test with default Python" && python -m sentsegm.test.ops
+	# hash python2 2>/dev/null && echo "Test with Python v2" && python2 -m sentsegm.test.ops
+	# hash python3 2>/dev/null && echo "Test with Python v3" && python3 -m sentsegm.test.ops
+	python -m sentsegm.test.split_words
 
 
 

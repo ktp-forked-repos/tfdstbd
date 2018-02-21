@@ -6,7 +6,7 @@ from __future__ import print_function
 import os
 import tensorflow as tf
 import unittest
-from ..dataset import Trainer
+from sentsegm.sentsegm.dataset import Trainer
 from ..ops import split_tokens
 
 

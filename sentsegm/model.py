@@ -4,7 +4,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 from .ops import split_tokens
-from .metric import f1_score
+from .metrics import f1_score
 
 
 class Model:
