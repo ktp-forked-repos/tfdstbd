@@ -2,8 +2,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from collections import Counter
 from io import open
+from collections import Counter
 from operator import itemgetter
 from six.moves import cPickle
 
@@ -25,7 +25,7 @@ class Vocabulary:
                 del self._cnt[word]
 
     def items(self):
-        # Due to different behaviour for items with same counts in Python 2 and 3 we should resort result
+        # Due to different behaviour for items with same counts in Python 2 and 3 we should resort result ourselves
         result = self._cnt.most_common()
         result.sort(key=itemgetter(0))
         result.sort(key=itemgetter(1), reverse=True)
@@ -33,18 +33,26 @@ class Vocabulary:
 
         return list(result)
 
+    def most_common(self, n=None):
+        return self._cnt.most_common(n)
+
     def save(self, filename, binary=True):
         if binary:
             with open(filename, 'wb') as fout:
                 cPickle.dump(self._cnt, fout, protocol=2)
         else:
+            def _safe(word):
+                word = u'{}'.format(word)
+                if not len(word): return '<EMPTY>'
+                if word.isspace(): return 'SPACE_{}'.format(ord(word))
+                return word
+
             with open(filename, 'w', encoding='utf-8') as fout:
-                fout.write(u'token\tfrequency\n')
+                line = u'{}\t{}\n'.format(_safe('token'), _safe('frequency'))
+                fout.write(line)
                 for w in self.items():
-                    f = self._cnt[w]
-                    w_safe = w if not w.isspace() else 'space_{}'.format(ord(w))
-                    w_safe = w if len(w_safe) else '<EMPTY>'
-                    fout.write(u'{}\t{}\n'.format(w_safe, f))
+                    line = u'{}\t{}\n'.format(_safe(w), _safe(self._cnt[w]))
+                    fout.write(line)
 
     @staticmethod
     def load(filename):

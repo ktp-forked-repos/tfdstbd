@@ -7,7 +7,7 @@ def model_params():
     return {
         # 'vocab_words': trainer.vocab_words(),
         'embed_size': 50,
-        'rnn_layers': 2,
+        'rnn_layers': 1,
         'rnn_size': 64,
         'keep_prob': 0.8
     }

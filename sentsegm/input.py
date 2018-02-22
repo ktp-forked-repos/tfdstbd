@@ -5,16 +5,14 @@ from __future__ import print_function
 import os
 import itertools
 import tensorflow as tf
-from io import open
-from operator import itemgetter
 from random import Random
 from functools import partial
 from six.moves import cPickle
 from tfucops import expand_split_words
 
 from .vocab import Vocabulary
+from .model import Model
 
-PAD_TOKEN = '<PAD>'
 
 
 class Trainer:
@@ -24,7 +22,7 @@ class Trainer:
     VOCABULARY_TARGET_NAME = 'vocabulary.pkl'
     WEIGHTS_TARGET_NAME = 'weights.pkl'
 
-    def __init__(self, data_dir, test_size, batch_size, doc_size, random_seed=None):
+    def __init__(self, data_dir, test_size, batch_size, doc_size):
         self.data_dir = data_dir
 
         self.test_size = test_size
@@ -37,7 +35,6 @@ class Trainer:
         assert 0 < doc_size, 'doc_size should be above 0'
 
         self._random_generator = Random()
-        self._random_generator.seed(random_seed)
 
         self._load_dataset()
         self._split_dataset()
@@ -60,11 +57,10 @@ class Trainer:
         tf.logging.info('Creating dataset from {}'.format(source_filename))
 
         input_ph = tf.placeholder(tf.string, shape=(None))
-        split_op = split_tokens(input_ph)
-        result_op = tf.sparse_tensor_to_dense(split_op, default_value='')
+        result_op = expand_split_words(input_ph)
 
-        with open(source_filename, 'r', encoding='utf-8') as dataset_file:
-            paragraphs = dataset_file.read()
+        with open(source_filename, 'rb') as dataset_file:
+            paragraphs = dataset_file.read().decode('utf-8')
         paragraphs = paragraphs.split('\n\n')  # 0D -> 1D (text -> paragraphs)
         paragraphs = map(lambda p: p.split('\n'), paragraphs)  # 1D -> 2D (paragraphs -> sentences)
         paragraphs = map(partial(map, lambda s: s.strip()), paragraphs)  # strip sentences
@@ -120,8 +116,13 @@ class Trainer:
         vocab.trim(Trainer.VOCABULARY_MIN_FREQ)
         vocab.save(vocab_filename)
         tf.logging.info('Vocabulary (as binary) saved to {}'.format(vocab_filename))
-        vocab.save(vocab_filename[:-4] + '.txt', False)
-        tf.logging.info('Vocabulary (as text) saved to {}'.format(vocab_filename[:-4] + '.txt'))
+
+        # Hack to save PAD & UNK TOKENS in same order as Model use them in embedding vocabulary
+        _, max_freq = vocab.most_common(1)[0]
+        vocab.fit([Model.PAD_TOKEN] * (max_freq + 2))
+        vocab.fit([Model.UNK_TOKEN] * (max_freq + 1))
+        vocab.save(vocab_filename[:-4] + '.tsv', False)
+        tf.logging.info('Vocabulary (as TSV) saved to {}'.format(vocab_filename[:-4] + '.txt'))
 
     def vocab_words(self):
         assert isinstance(self._train_vocab, Vocabulary)
@@ -190,40 +191,79 @@ class Trainer:
                 y.extend([0] * len(tokens) + y_glue)
             assert len(X) == len(y), 'items count should be equal labels count'
 
-            yield u''.join(X[:-1]), y[:-1]
+            X = [_.encode('utf-8') for _ in X]  # required due to TF 1.6.0rc1 bug in Python2
+
+            yield {'document': X[:-1]}, y[:-1]
 
     def _train_generator(self):
+        print('TRAIN GENERATOR // TRAIN GENERATOR // TRAIN GENERATOR')
         data = list(self._train_data)  # make a copy
         self._random_generator.shuffle(data, self._random_generator.random)
 
         return self._data_generator(data)
 
     def _test_generator(self):
+        print('TEST GENERATOR // TEST GENERATOR // TEST GENERATOR')
         return self._data_generator(self._test_data)
 
     def _dataset_generator(self, generator):
         dataset = tf.data.Dataset.from_generator(
             generator,
-            (tf.string, tf.int32),
-            (tf.TensorShape([]), tf.TensorShape([None]))
+            ({'document': tf.string}, tf.int32),
+            ({'document': tf.TensorShape([None])}, tf.TensorShape([None]))
         )
-        dataset = dataset.padded_batch(self.batch_size, padded_shapes=([], [None]))
-        # dataset = dataset.map(lambda X, y: ({'document': X}, y))
-        dataset = dataset.repeat(4)
-        dataset = dataset.prefetch(4)
+        dataset = dataset.padded_batch(
+            self.batch_size,
+            padded_shapes=({'document': [None]}, [None]),
+            padding_values=({'document': Model.PAD_TOKEN}, 0))
+        dataset = dataset.map(_extend_length, num_parallel_calls=10)
+        dataset = dataset.shuffle(100)
+        dataset = dataset.repeat(20)
+        dataset = dataset.prefetch(10)
 
         return dataset
 
-    def train_dataset(self):
+    def train_input_fn(self):
         return self._dataset_generator(self._train_generator)
 
-    def test_dataset(self):
+    def test_input_fn(self):
         return self._dataset_generator(self._test_generator)
 
 
 def predict_input_fn(documents, batch_size=1):
-    dataset = tf.data.Dataset.from_tensor_slices(documents)
-    dataset = dataset.map(lambda x: expand_split_words(x, default_value=PAD_TOKEN)) # TODO: parallel
-    dataset = dataset.padded_batch(batch_size, padded_shapes=([None]), padding_values=(PAD_TOKEN))
+    print('PREDICT GENERATOR // PREDICT GENERATOR // PREDICT GENERATOR')
+    assert type(documents) == list
+
+    dataset = tf.data.Dataset.from_tensor_slices({'document': documents})
+
+    dataset = dataset.map(_split_words, num_parallel_calls=10)
+    dataset = dataset.padded_batch(
+        batch_size,
+        padded_shapes={'document': [None]},
+        padding_values={'document': Model.PAD_TOKEN})
+    dataset = dataset.map(_extend_length, num_parallel_calls=10)
+    dataset = dataset.prefetch(10)
 
     return dataset
+
+
+def _split_words(features):
+    assert type(features) == dict
+    assert 'document' in features
+
+    features['document'] = expand_split_words(features['document'], default_value=Model.PAD_TOKEN)
+
+    return features
+
+
+def _extend_length(*args):
+    assert len(args) > 0
+
+    assert type(args[0]) == dict
+    assert 'document' in args[0]
+
+    mask = tf.not_equal(args[0]['document'], Model.PAD_TOKEN)  # 0 for padded tokens, 1 for real ones
+    mask = tf.cast(mask, tf.int32)
+    args[0]['length'] = tf.reduce_sum(mask, 1)  # real tokens count
+
+    return args

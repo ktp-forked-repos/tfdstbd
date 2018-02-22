@@ -29,11 +29,8 @@ def f1_score(labels, predictions, weights=None, metrics_collections=None, update
             with tf.name_scope(name, 'compute', [precision, recall]):
                 return tf.where(
                     tf.greater(precision + recall, 0),
-                    tf.div(
-                        tf.multiply(
-                            2.,
-                            tf.multiply(precision, recall)
-                        ),
+                    2. * tf.div(
+                        precision * recall,
                         precision + recall
                     ),
                     0,

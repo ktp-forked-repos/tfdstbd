@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -16,18 +17,18 @@ class TestVocabulary(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
-    def test_fit(self):
+    def testFit(self):
         vocab = Vocabulary()
         vocab.fit(['1', ' ', '2', ' ', '1', '\n', '2', '\t', '3', '.'])
         self.assertEqual(vocab.items(), [' ', '1', '2', '\t', '\n', '.', '3'])
 
-    def test_fit_trim(self):
+    def testFitTrim(self):
         vocab = Vocabulary()
         vocab.fit(['1', ' ', '2', ' ', '1', '\n', '2', '\t', '3', '.'])
         vocab.trim(2)
         self.assertEqual(vocab.items(), [' ', '1', '2'])
 
-    def test_save_load(self):
+    def testSaveLoad(self):
         vocab_filename = os.path.join(self.temp_dir, 'vocab.pkl')
 
         vocab1 = Vocabulary()
@@ -39,6 +40,18 @@ class TestVocabulary(unittest.TestCase):
 
         vocab1.trim(2)
         self.assertNotEqual(vocab1.items(), vocab2.items())
+
+    def testSaveTsv(self):
+        vocab_filename = os.path.join(self.temp_dir, 'vocab.tsv')
+
+        vocab = Vocabulary()
+        vocab.fit(['1', ' ', u'2', ' ', '1', '\n', '2', '\t', u'а', '.'])
+        vocab.save(vocab_filename, False)
+        expected = u'token\tfrequency\nSPACE_32\t2\n1\t2\n2\t2\nSPACE_9\t1\nSPACE_10\t1\n.\t1\nа\t1\n'
+
+        with open(vocab_filename, 'rb') as vf:
+            result = vf.read().decode('utf-8')
+        self.assertEqual(expected, result)
 
 
 if __name__ == '__main__':

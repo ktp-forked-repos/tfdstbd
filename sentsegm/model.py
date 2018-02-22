@@ -3,8 +3,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from .ops import split_tokens
-from .metrics import f1_score
+from .metric import f1_score
 
 
 class Model:
@@ -13,9 +12,8 @@ class Model:
     NUM_CLASSES = 2
 
     def __init__(self, vocab_words, embed_size, rnn_layers, rnn_size, keep_prob):
-        # PAD_TOKEN should have index==0 to calculate real sequence length later in padded batch
         vocab_words = [Model.PAD_TOKEN, Model.UNK_TOKEN] + vocab_words
-        vocab_size = len(vocab_words)
+        self.vocab_size = len(vocab_words)
         # vocab_words = tf.constant(vocab_words)
         self.vocab_table = tf.contrib.lookup.index_table_from_tensor(
             mapping=vocab_words,
@@ -23,13 +21,14 @@ class Model:
             default_value=1  # UNK_TOKEN
         )
 
+        self.embed_size = embed_size
         self.param_rnn_layers = rnn_layers
         self.param_rnn_size = rnn_size
         self.param_keep_prob = keep_prob
 
-        self.token_embeddings = tf.get_variable('token_embeddings', [vocab_size, embed_size])
-        self.softmax_weight = tf.get_variable('softmax_weight', [2 * self.param_rnn_size, Model.NUM_CLASSES])
-        self.softmax_bias = tf.get_variable('softmax_bias', [Model.NUM_CLASSES])
+        # self.token_embeddings = tf.get_variable('token_embeddings', [vocab_size, embed_size])
+        # self.softmax_weight = tf.get_variable('softmax_weight', [2 * self.param_rnn_size, Model.NUM_CLASSES])
+        # self.softmax_bias = tf.get_variable('softmax_bias', [Model.NUM_CLASSES])
 
     def _rnn_cell(self, training):
         cells = []
@@ -45,39 +44,45 @@ class Model:
 
         return tf.contrib.rnn.MultiRNNCell(cells)
 
-    def __call__(self, documents, training):
+    def __call__(self, features, training):
         """Add operations to classify a batch of tokens.
         Args:
-          inputs: A Tensor representing a batch of tokenized documents.
+          features: A dict with 'document' and 'length' keys
           training: A boolean. Set to True to add operations required only when training the classifier.
         Returns:
           A logits Tensor with shape [<batch_size>, 2].
         """
 
-        document_tokens = split_tokens(documents)  # documents -> tokens
-        document_tokens = tf.sparse_tensor_to_dense(document_tokens, default_value=Model.PAD_TOKEN)
-
-        token_ids = self.vocab_table.lookup(document_tokens)  # tokens -> ids
-        inputs_mask = tf.sign(token_ids)  # 0 for padded tokens, 1 for real ones
-        inputs_length = tf.cast(tf.reduce_sum(inputs_mask, 1), tf.int32)  # real tokens count
-        max_length = tf.reduce_max(inputs_length)
-
-        inputs_embedding = tf.nn.embedding_lookup(self.token_embeddings, token_ids)
-        (output_fw, output_bw), _ = tf.nn.bidirectional_dynamic_rnn(
-            self._rnn_cell(training),
-            self._rnn_cell(training),
-            inputs_embedding,
-            sequence_length=inputs_length,
-            dtype=tf.float32
+        word_ids = self.vocab_table.lookup(features['document'])  # tokens -> ids
+        # word_ids = tf.feature_column.input_layer(features, self.feature_columns)
+        word_vectors = tf.contrib.layers.embed_sequence(
+            word_ids,
+            vocab_size=self.vocab_size,
+            embed_dim=self.embed_size
         )
 
-        rnn_output = tf.concat([output_fw, output_bw], 0)
+        # (output_fw, output_bw), _ = tf.nn.bidirectional_dynamic_rnn(
+        #     self._rnn_cell(training),
+        #     self._rnn_cell(training),
+        #     word_vectors,
+        #     sequence_length=features['length'],
+        #     dtype=tf.float32
+        # )
+        # rnn_output = tf.concat([output_fw, output_bw], 0)
+        # rnn_output = tf.reshape(rnn_output, [-1, self.param_rnn_size * 2])
 
-        rnn_output = tf.reshape(rnn_output, [-1, self.param_rnn_size * 2])
-        softmax_logits = tf.nn.xw_plus_b(rnn_output, self.softmax_weight, self.softmax_bias)
-        softmax_logits = tf.reshape(softmax_logits, [-1, max_length, Model.NUM_CLASSES])
+        rnn_output, _ = tf.nn.dynamic_rnn(
+            self._rnn_cell(training),
+            word_vectors,
+            dtype=tf.float32,
+            sequence_length=features['length'],
+        )
+        rnn_output = tf.reshape(rnn_output, [-1, self.param_rnn_size])
 
-        return softmax_logits
+        logits = tf.layers.dense(rnn_output, Model.NUM_CLASSES, activation=None)
+        logits = tf.reshape(logits, [-1, tf.reduce_max(features['length']), Model.NUM_CLASSES])
+
+        return logits
 
 
 def model_fn(features, labels, mode, params):
@@ -85,15 +90,12 @@ def model_fn(features, labels, mode, params):
     model = Model(params['vocab_words'], params['embed_size'], params['rnn_layers'], params['rnn_size'],
                   params['keep_prob'])
 
-    inputs = features
-    if isinstance(inputs, dict):
-        inputs = features['inputs']
-
     if mode == tf.estimator.ModeKeys.PREDICT:
-        logits = model(inputs, training=False)
+        logits = model(features, training=False)
         predictions = {
-            'classes': tf.argmax(logits, axis=1),
-            'probabilities': tf.nn.softmax(logits),
+            'document': features['document'],
+            'class': tf.argmax(logits, axis=2),
+            'probability': tf.nn.softmax(logits),
         }
         return tf.estimator.EstimatorSpec(
             mode=tf.estimator.ModeKeys.PREDICT,
@@ -102,41 +104,35 @@ def model_fn(features, labels, mode, params):
             #     'classify': tf.estimator.export.PredictOutput(predictions)
             # }
         )
-    if mode == tf.estimator.ModeKeys.EVAL:
-        logits = model(inputs, training=False)
+
+    if mode == tf.estimator.ModeKeys.EVAL or mode == tf.estimator.ModeKeys.TRAIN:
+        is_training = mode == tf.estimator.ModeKeys.TRAIN
+        logits = model(features, training=is_training)
         loss = tf.losses.sparse_softmax_cross_entropy(labels=labels, logits=logits)
         eval_metrics = {
             'accuracy': tf.metrics.accuracy(
                 labels=labels,
                 predictions=tf.argmax(logits, axis=2),
-                # weights=params['class_weights']
             ),
             'f1_score': f1_score(
                 labels=labels,
                 predictions=tf.argmax(logits, axis=2),
-                # weights=params['class_weights']
             )
         }
+
+    if mode == tf.estimator.ModeKeys.EVAL:
         return tf.estimator.EstimatorSpec(
             mode=tf.estimator.ModeKeys.EVAL,
             loss=loss,
             eval_metric_ops=eval_metrics
         )
+
     if mode == tf.estimator.ModeKeys.TRAIN:
-        logits = model(inputs, training=True)
-        loss = tf.losses.sparse_softmax_cross_entropy(labels=labels, logits=logits
-                                                      # , weights=params['class_weights']
-                                                      )
         optimizer = tf.train.AdamOptimizer(learning_rate=1e-4)
         train = optimizer.minimize(loss, tf.train.get_or_create_global_step())
 
-        accuracy = tf.metrics.accuracy(
-            labels=labels,
-            predictions=tf.argmax(logits, axis=2),
-            # weights=params['class_weights']
-        )
-        tf.identity(accuracy[1], name='train_accuracy')
-        tf.summary.scalar('train_accuracy', accuracy[1])
+        tf.summary.scalar('accuracy', eval_metrics['accuracy'][1])
+        tf.summary.scalar('f1_score', eval_metrics['f1_score'][1])
 
         return tf.estimator.EstimatorSpec(
             mode=tf.estimator.ModeKeys.TRAIN,

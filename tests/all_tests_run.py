@@ -5,7 +5,7 @@ from __future__ import print_function
 import tensorflow as tf
 
 from .vocab import TestVocabulary
-from .dataset import TestTrainer
+from .data import TestTrainer
 
 
 if __name__ == "__main__":

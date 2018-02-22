@@ -5,7 +5,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 from tensorflow.python.framework import ops
-from sentsegm.metrics import f1_score
+from sentsegm.metric import f1_score
 
 
 class TestF1Score(tf.test.TestCase):
@@ -19,8 +19,8 @@ class TestF1Score(tf.test.TestCase):
                     'f1_score/recall/true_positives/count:0',
                     'f1_score/precision/false_positives/count:0',
                     'f1_score/recall/false_negatives/count:0')
-        self.assertEquals(set(expected), set(v.name for v in tf.local_variables()))
-        self.assertEquals(set(expected), set(v.name for v in ops.get_collection(ops.GraphKeys.METRIC_VARIABLES)))
+        self.assertEqual(set(expected), set(v.name for v in tf.local_variables()))
+        self.assertEqual(set(expected), set(v.name for v in ops.get_collection(ops.GraphKeys.METRIC_VARIABLES)))
 
     def testMetricsCollection(self):
         my_collection_name = '__metrics__'
@@ -182,6 +182,17 @@ class TestF1Score(tf.test.TestCase):
             sess.run(tf.local_variables_initializer())
             sess.run(update_op)
             self.assertEqual(0.0, f1_value.eval())
+
+    def testKnownResult(self):
+        predictions = tf.constant([1, 1, 0, 0, 0, 1, 0, 1])
+        labels = tf.constant([1, 0, 0, 1, 0, 1, 1, 1])
+
+        f1_value, update_f1 = f1_score(labels, predictions)
+
+        with self.test_session() as sess:
+            sess.run(tf.local_variables_initializer())
+            sess.run(update_f1)
+            self.assertAlmostEqual(0.6666667, f1_value.eval())
 
     def testAlmostAllFalse(self):
         predictions = tf.constant([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])

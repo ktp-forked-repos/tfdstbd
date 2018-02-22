@@ -13,8 +13,5 @@ setup(name='sentsegm',
       license='MIT',
       packages=['sentsegm'],
       install_requires=[
-          'nltk',
-          'tensorflow',
-          'repoze.lru'
-      ],
-      zip_safe=False)
+          'tensorflow>=1.6.0rc1',
+      ])
