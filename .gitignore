@@ -104,3 +104,5 @@ ENV/
 sentsegm/data
 .DS_Store
 .idea/
+data/
+model/

@@ -4,14 +4,14 @@ from __future__ import print_function
 
 from setuptools import setup
 
-setup(name='sentsegm',
+setup(name='tfdsbd',
       version='0.1',
-      description='Sentence segmentation (boundary detection)',
-      url='https://github.com/shkarupa-alex/sentsegm',
+      description='Deep sentence boundary detection implemented with Tensorflow',
+      url='https://github.com/shkarupa-alex/tfdsbd',
       author='Shkarupa Alex',
       author_email='shkarupa.alex@gmail.com',
       license='MIT',
-      packages=['sentsegm'],
+      packages=['tfdsbd'],
       install_requires=[
-          'tensorflow>=1.6.0rc1',
+          'tensorflow>=1.5.0',
       ])

@@ -41,10 +41,8 @@ def f1_score(labels, predictions, weights=None, metrics_collections=None, update
 
         if metrics_collections:
             ops.add_to_collections(metrics_collections, value)
-            # tf.python.ops.add_to_collections(metrics_collections, value)
 
         if updates_collections:
             ops.add_to_collections(updates_collections, update_op)
-            # tf.python.ops.add_to_collections(updates_collections, update_op)
 
         return value, update_op

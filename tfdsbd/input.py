@@ -8,11 +8,10 @@ import tensorflow as tf
 from random import Random
 from functools import partial
 from six.moves import cPickle
-from tfucops import expand_split_words
+from tfucops import expand_split_words, transform_normalize_unicode
 
 from .vocab import Vocabulary
 from .model import Model
-
 
 
 class Trainer:
@@ -57,13 +56,14 @@ class Trainer:
         tf.logging.info('Creating dataset from {}'.format(source_filename))
 
         input_ph = tf.placeholder(tf.string, shape=(None))
-        result_op = expand_split_words(input_ph)
+        result_op = transform_normalize_unicode(input_ph, 'NFC')
+        result_op = expand_split_words(result_op)
 
         with open(source_filename, 'rb') as dataset_file:
             paragraphs = dataset_file.read().decode('utf-8')
         paragraphs = paragraphs.split('\n\n')  # 0D -> 1D (text -> paragraphs)
         paragraphs = map(lambda p: p.split('\n'), paragraphs)  # 1D -> 2D (paragraphs -> sentences)
-        paragraphs = map(partial(map, lambda s: s.strip()), paragraphs)  # strip sentences
+        paragraphs = map(partial(map, lambda s: s.strip('\n')), paragraphs)  # strip sentences
         paragraphs = map(partial(filter, len), paragraphs)  # filter out 0-len sentences
         paragraphs = map(list, paragraphs)  # sentence iterator -> sentence list
         paragraphs = filter(len, paragraphs)  # filter out 0-len paragraphs
@@ -76,7 +76,6 @@ class Trainer:
                 tokens = map(partial(filter, len), tokens)  # filter out 0-len tokens
                 tokens = map(partial(map, lambda t: t.decode('utf-8')), tokens)  # decode binary tokens as UTF-8
                 tokens = list(map(list, tokens))  # tokens iterator -> tokens list
-
                 new_paragraphs.append(tokens)
 
         dataset_filename = os.path.join(self.data_dir, Trainer.DATASET_TARGET_NAME)
@@ -100,7 +99,6 @@ class Trainer:
         tf.logging.info('Loading vocabulary from {}'.format(vocab_filename))
         self._train_vocab = Vocabulary.load(vocab_filename)
         tf.logging.info('Vocabulary loaded from {}'.format(vocab_filename))
-        self._train_vocab.save(vocab_filename[:-4] + '.txt', False)
 
     def _prepare_vocab(self):
         assert isinstance(self._train_data, list)
@@ -212,58 +210,131 @@ class Trainer:
             ({'document': tf.string}, tf.int32),
             ({'document': tf.TensorShape([None])}, tf.TensorShape([None]))
         )
+        # dataset = dataset.map(_transform_form, num_parallel_calls=10) # TODO
         dataset = dataset.padded_batch(
             self.batch_size,
             padded_shapes=({'document': [None]}, [None]),
             padding_values=({'document': Model.PAD_TOKEN}, 0))
         dataset = dataset.map(_extend_length, num_parallel_calls=10)
-        dataset = dataset.shuffle(100)
-        dataset = dataset.repeat(20)
-        dataset = dataset.prefetch(10)
 
         return dataset
 
     def train_input_fn(self):
-        return self._dataset_generator(self._train_generator)
+        dataset = self._dataset_generator(self._train_generator)
+        dataset = dataset.shuffle(100)
+        dataset = dataset.repeat(50)
+        dataset = dataset.prefetch(10)
+
+        return dataset
 
     def test_input_fn(self):
         return self._dataset_generator(self._test_generator)
 
 
-def predict_input_fn(documents, batch_size=1):
-    print('PREDICT GENERATOR // PREDICT GENERATOR // PREDICT GENERATOR')
-    assert type(documents) == list
+def train_input_fn(wildcard, batch_size):
+    # Create dataset from multiple TFRecords files
+    files = tf.data.TFRecordDataset.list_files(wildcard)
+    dataset = files.interleave(
+        lambda file: tf.data.TFRecordDataset(file, compression_type='GZIP'),
+        cycle_length=5
+    )
 
-    dataset = tf.data.Dataset.from_tensor_slices({'document': documents})
+    # Parse serialized examples
+    def _parse_example(example_proto):
+        features = tf.parse_single_example(
+            example_proto,
+            features={
+                'document': tf.FixedLenFeature(1, tf.string),
+                'labels': tf.FixedLenSequenceFeature([], tf.int64, allow_missing=True),
+            })
 
-    dataset = dataset.map(_split_words, num_parallel_calls=10)
+        return {'document': features['document'][0]}, features['labels']
+        # context_parsed, sequence_parsed = tf.parse_single_sequence_example(
+        #     serialized=example_proto,
+        #     context_features={'document': tf.FixedLenFeature([], dtype=tf.string)},
+        #     sequence_features={'labels': tf.FixedLenSequenceFeature([], dtype=tf.int64)}
+        # )
+        # return context_parsed['document'], sequence_parsed['labels']
+
+    dataset = dataset.map(_parse_example)
+
+    # Extract features
+    def _parse_features(features, labels):
+        features['tokens'] = expand_split_words(
+            features['document'],
+            default_value=Model.PAD_TOKEN
+        )
+        features['length'] = tf.size(features['tokens'])
+
+        return features, labels
+
+    dataset = dataset.map(_parse_features, num_parallel_calls=10)
+
+    # Create padded batch
     dataset = dataset.padded_batch(
         batch_size,
-        padded_shapes={'document': [None]},
-        padding_values={'document': Model.PAD_TOKEN})
-    dataset = dataset.map(_extend_length, num_parallel_calls=10)
+        padded_shapes=({'document': 1, 'tokens': [None], 'length': 1}, [None]),
+        padding_values=({'tokens': Model.PAD_TOKEN}, 0)
+    )
     dataset = dataset.prefetch(10)
 
     return dataset
 
 
-def _split_words(features):
-    assert type(features) == dict
-    assert 'document' in features
+# def predict_input_fn(documents, batch_size=1):
+#     assert type(documents) == list
+#
+#     expected_filename = os.path.join(self.temp_dir, '*.tfrecords.gz')
+#     files = tf.data.TFRecordDataset.list_files(expected_filename)
+#     dataset = files.interleave(
+#         lambda f: tf.data.TFRecordDataset([f], compression_type='GZIP'),
+#         cycle_length=5
+#     )
+#     dataset = dataset.map(_parse_function)
+#     iterator = dataset.make_one_shot_iterator()
+#     next_element = iterator.get_next()
+#
+#     dataset = tf.data.Dataset.from_tensor_slices({'document': documents})
+#
+#     # dataset = dataset.map(_transform_form, num_parallel_calls=10) # TODO
+#     dataset = dataset.map(_split_words, num_parallel_calls=10)
+#     dataset = dataset.padded_batch(
+#         batch_size,
+#         padded_shapes={'document': [None]},
+#         padding_values={'document': Model.PAD_TOKEN})
+#     dataset = dataset.prefetch(10)
+#
+#     return dataset
 
-    features['document'] = expand_split_words(features['document'], default_value=Model.PAD_TOKEN)
-
-    return features
-
-
-def _extend_length(*args):
-    assert len(args) > 0
-
-    assert type(args[0]) == dict
-    assert 'document' in args[0]
-
-    mask = tf.not_equal(args[0]['document'], Model.PAD_TOKEN)  # 0 for padded tokens, 1 for real ones
-    mask = tf.cast(mask, tf.int32)
-    args[0]['length'] = tf.reduce_sum(mask, 1)  # real tokens count
-
-    return args
+#
+# def _split_words(features):
+#     assert type(features) == dict
+#     assert 'document' in features
+#
+#     features['document'] = expand_split_words(features['document'], default_value=Model.PAD_TOKEN)
+#
+#     return features
+#
+#
+# def _transform_form(*args):
+#     assert len(args) > 0
+#
+#     assert type(args[0]) == dict
+#     assert 'document' in args[0]
+#
+#     args[0]['document'] = transform_normalize_unicode(args[0]['document'], 'NFC')
+#
+#     return args
+#
+#
+# def _extend_length(*args):
+#     assert len(args) > 0
+#
+#     assert type(args[0]) == dict
+#     assert 'document' in args[0]
+#
+#     mask = tf.not_equal(args[0]['document'], Model.PAD_TOKEN)  # 0 for padded tokens, 1 for real ones
+#     mask = tf.cast(mask, tf.int32)
+#     args[0]['length'] = tf.reduce_sum(mask, 1)  # real tokens count
+#
+#     return args

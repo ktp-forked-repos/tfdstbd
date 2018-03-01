@@ -26,10 +26,6 @@ class Model:
         self.param_rnn_size = rnn_size
         self.param_keep_prob = keep_prob
 
-        # self.token_embeddings = tf.get_variable('token_embeddings', [vocab_size, embed_size])
-        # self.softmax_weight = tf.get_variable('softmax_weight', [2 * self.param_rnn_size, Model.NUM_CLASSES])
-        # self.softmax_bias = tf.get_variable('softmax_bias', [Model.NUM_CLASSES])
-
     def _rnn_cell(self, training):
         cells = []
         for _ in range(self.param_rnn_layers):
@@ -37,7 +33,7 @@ class Model:
             if training:
                 cell = tf.contrib.rnn.DropoutWrapper(
                     cell,
-                    input_keep_prob=self.param_keep_prob,
+                    # input_keep_prob=self.param_keep_prob,
                     output_keep_prob=self.param_keep_prob
                 )
             cells.append(cell)
@@ -45,14 +41,6 @@ class Model:
         return tf.contrib.rnn.MultiRNNCell(cells)
 
     def __call__(self, features, training):
-        """Add operations to classify a batch of tokens.
-        Args:
-          features: A dict with 'document' and 'length' keys
-          training: A boolean. Set to True to add operations required only when training the classifier.
-        Returns:
-          A logits Tensor with shape [<batch_size>, 2].
-        """
-
         word_ids = self.vocab_table.lookup(features['document'])  # tokens -> ids
         # word_ids = tf.feature_column.input_layer(features, self.feature_columns)
         word_vectors = tf.contrib.layers.embed_sequence(
@@ -61,23 +49,23 @@ class Model:
             embed_dim=self.embed_size
         )
 
-        # (output_fw, output_bw), _ = tf.nn.bidirectional_dynamic_rnn(
-        #     self._rnn_cell(training),
-        #     self._rnn_cell(training),
-        #     word_vectors,
-        #     sequence_length=features['length'],
-        #     dtype=tf.float32
-        # )
-        # rnn_output = tf.concat([output_fw, output_bw], 0)
-        # rnn_output = tf.reshape(rnn_output, [-1, self.param_rnn_size * 2])
-
-        rnn_output, _ = tf.nn.dynamic_rnn(
+        rnn_output, _, _ = tf.contrib.rnn.stack_bidirectional_dynamic_rnn(
+            self._rnn_cell(training),
             self._rnn_cell(training),
             word_vectors,
-            dtype=tf.float32,
             sequence_length=features['length'],
+            dtype=tf.float32
         )
-        rnn_output = tf.reshape(rnn_output, [-1, self.param_rnn_size])
+        # rnn_output = tf.concat([output_fw, output_bw], 2)
+        rnn_output = tf.reshape(rnn_output, [-1, self.param_rnn_size * 2])
+
+        # rnn_output, _ = tf.nn.dynamic_rnn(
+        #     self._rnn_cell(training),
+        #     word_vectors,
+        #     dtype=tf.float32,
+        #     sequence_length=features['length'],
+        # )
+        # rnn_output = tf.reshape(rnn_output, [-1, self.param_rnn_size])
 
         logits = tf.layers.dense(rnn_output, Model.NUM_CLASSES, activation=None)
         logits = tf.reshape(logits, [-1, tf.reduce_max(features['length']), Model.NUM_CLASSES])
@@ -128,6 +116,8 @@ def model_fn(features, labels, mode, params):
         )
 
     if mode == tf.estimator.ModeKeys.TRAIN:
+        # TODO tf.contrib.layers.optimize_loss https://github.com/tensorflow/models/blob/master/tutorials/rnn/quickdraw/train_model.py
+        # TODO: mask loss
         optimizer = tf.train.AdamOptimizer(learning_rate=1e-4)
         train = optimizer.minimize(loss, tf.train.get_or_create_global_step())
 
