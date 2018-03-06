@@ -4,9 +4,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 
-from .vocab import TestVocabulary
-from .data import TestTrainer
-
+from .convert import TestTokenizeDataset, TestMakeDataset, TestWriteDataset
 
 if __name__ == "__main__":
     tf.test.main()

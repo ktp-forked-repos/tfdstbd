@@ -191,12 +191,6 @@ class TestWriteDataset(tf.test.TestCase):
                     'labels': tf.FixedLenSequenceFeature([], tf.int64, allow_missing=True),
                 })
             return features['document'][0], features['labels']
-            # context_parsed, sequence_parsed = tf.parse_single_sequence_example(
-            #     serialized=example_proto,
-            #     context_features={'document': tf.FixedLenFeature([], dtype=tf.string)},
-            #     sequence_features={'labels': tf.FixedLenSequenceFeature([], dtype=tf.int64)}
-            # )
-            # return context_parsed['document'], sequence_parsed['labels']
 
         expected_filename = os.path.join(self.temp_dir, '*.tfrecords.gz')
         files = tf.data.TFRecordDataset.list_files(expected_filename)

@@ -9,9 +9,6 @@ from six.moves import cPickle
 
 
 class Vocabulary:
-    PAD_TOKEN = '<PAD>'
-    UNK_TOKEN = '<UNK>'
-
     def __init__(self):
         self._cnt = Counter()
 

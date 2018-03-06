@@ -11,6 +11,8 @@ import sys
 import tensorflow as tf
 from functools import partial
 from tfucops import expand_split_words, transform_normalize_unicode
+from tfdsbd.vocab import Vocabulary
+from tfdsbd.model import Model
 
 
 def tokenize_dataset(raw_paragraphs):
@@ -92,15 +94,6 @@ def write_dataset(dest_path, set_title, base_name, rec_size, set_data):
             'document': tf.train.Feature(bytes_list=tf.train.BytesList(value=[tf.compat.as_bytes(document)])),
             'labels': tf.train.Feature(int64_list=tf.train.Int64List(value=labels)),
         })).SerializeToString()
-        # return tf.train.SequenceExample(
-        #     context=tf.train.Features(feature={
-        #         'document': tf.train.Feature(bytes_list=tf.train.BytesList(value=[tf.compat.as_bytes(document)])),
-        #     }),
-        #     feature_lists=tf.train.FeatureLists(feature_list={
-        #         'labels': tf.train.FeatureList(feature=[
-        #             tf.train.Feature(int64_list=tf.train.Int64List(value=[label])) for label in labels]),
-        #     })
-        # ).SerializeToString()
 
     if not len(set_data):
         return
@@ -144,6 +137,23 @@ def main(argv):
     train_dataset = make_dataset(train_smaples, FLAGS.doc_size, FLAGS.num_repeats)
     write_dataset(FLAGS.dest_path, 'train', base_name, FLAGS.rec_size, train_dataset)
     tf.logging.info('Training dataset processed')
+
+    tf.logging.info('Processing training vocabulary with min freq = 10')
+    words = itertools.chain.from_iterable(train_smaples)  # list of paragraphs to list of sentences
+    words = itertools.chain.from_iterable(words)  # list of sentences to list of tokens
+    words = list(words)
+
+    vocab = Vocabulary()
+    vocab.fit(words)
+    vocab.trim(10)
+    vocab_filename = os.path.join(FLAGS.dest_path, 'vocabulary')
+    vocab.save(vocab_filename + '.pkl')
+
+    tf.logging.info('Vocabulary (as binary) saved to {}'.format(vocab_filename + '.pkl'))
+
+    vocab.fit([Model.UNK_TOKEN, Model.PAD_TOKEN])
+    vocab.save(vocab_filename + '.tsv', False)
+    tf.logging.info('Vocabulary (as text) saved to {}'.format(vocab_filename + '.tsv'))
 
     tf.logging.info('Processing validation dataset ({} paragraphs)'.format(valid_count))
     valid_smaples = tokenized_samples[train_count: train_count + valid_count]
