@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import re
 from io import open
 from collections import Counter
 from operator import itemgetter
@@ -33,23 +34,24 @@ class Vocabulary:
     def most_common(self, n=None):
         return self._cnt.most_common(n)
 
-    def save(self, filename, binary=True):
-        if binary:
-            with open(filename, 'wb') as fout:
-                cPickle.dump(self._cnt, fout, protocol=2)
-        else:
-            def _safe(word):
-                word = u'{}'.format(word)
-                if not len(word): return '<EMPTY>'
-                if word.isspace(): return 'SPACE_{}'.format(ord(word))
-                return word
+    def save(self, filename):
+        with open(filename, 'wb') as fout:
+            cPickle.dump(self._cnt, fout, protocol=2)
 
-            with open(filename, 'w', encoding='utf-8') as fout:
+    def export(self, filename, header=True):
+        def _safe(word):
+            word = u'{}'.format(word)
+            if not len(word): return '[]'
+            word = re.sub(r'\s', lambda match: '[{}]'.format(ord(match.group(0))), word)
+            return word
+
+        with open(filename, 'w', encoding='utf-8') as fout:
+            if header:
                 line = u'{}\t{}\n'.format(_safe('token'), _safe('frequency'))
                 fout.write(line)
-                for w in self.items():
-                    line = u'{}\t{}\n'.format(_safe(w), _safe(self._cnt[w]))
-                    fout.write(line)
+            for w in self.items():
+                line = u'{}\t{}\n'.format(_safe(w), _safe(self._cnt[w]))
+                fout.write(line)
 
     @staticmethod
     def load(filename):

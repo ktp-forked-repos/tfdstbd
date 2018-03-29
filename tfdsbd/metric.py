@@ -2,8 +2,8 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from tensorflow.python.framework import ops
 import tensorflow as tf
+from tensorflow.python.framework import ops
 
 
 def f1_score(labels, predictions, weights=None, metrics_collections=None, updates_collections=None, name=None):

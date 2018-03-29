@@ -7,7 +7,7 @@ import os
 import shutil
 import tempfile
 import unittest
-from sentsegm.vocab import Vocabulary
+from ..vocab import Vocabulary
 
 
 class TestVocabulary(unittest.TestCase):
@@ -46,13 +46,9 @@ class TestVocabulary(unittest.TestCase):
 
         vocab = Vocabulary()
         vocab.fit(['1', ' ', u'2', ' ', '1', '\n', '2', '\t', u'а', '.'])
-        vocab.save(vocab_filename, False)
-        expected = u'token\tfrequency\nSPACE_32\t2\n1\t2\n2\t2\nSPACE_9\t1\nSPACE_10\t1\n.\t1\nа\t1\n'
+        vocab.export(vocab_filename)
+        expected = u'token\tfrequency\n[32]\t2\n1\t2\n2\t2\n[9]\t1\n[10]\t1\n.\t1\nа\t1\n'
 
         with open(vocab_filename, 'rb') as vf:
             result = vf.read().decode('utf-8')
         self.assertEqual(expected, result)
-
-
-if __name__ == '__main__':
-    unittest.main()

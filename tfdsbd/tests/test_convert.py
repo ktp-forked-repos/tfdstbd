@@ -3,19 +3,14 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from random import Random
+import numpy as np
 import os
 import shutil
-import sys
 import tensorflow as tf
 import tempfile
 import unittest
-from tfdsbd.convert import tokenize_dataset, make_dataset, write_dataset
 
-if sys.version_info.major == 3:
-    from unittest import mock
-else:
-    import mock
+from ..convert import tokenize_dataset, extract_vocab, make_dataset, write_dataset
 
 
 class TestTokenizeDataset(unittest.TestCase):
@@ -23,24 +18,24 @@ class TestTokenizeDataset(unittest.TestCase):
         source = 'Single sentence.\n\nFirst sentence in paragraph.\r\nSecond sentence in paragraph.'
         expected = [
             [
-                ['Single', ' ', 'sentence', '.'],
+                [u'Single', u' ', u'sentence', u'.'],
             ],
             [
-                ['First', ' ', 'sentence', ' ', 'in', ' ', 'paragraph', '.'],
-                ['Second', ' ', 'sentence', ' ', 'in', ' ', 'paragraph', '.'],
+                [u'First', u' ', u'sentence', u' ', u'in', u' ', u'paragraph', u'.'],
+                [u'Second', u' ', u'sentence', u' ', u'in', u' ', u'paragraph', u'.'],
             ],
         ]
         result = tokenize_dataset(source)
         self.assertEqual(expected, result)
 
     def testSpaces(self):
-        source = 'Single sentence.\n  \n\t\nNext single sentence.'
+        source = u'Single sentence.\n  \n\t\nNext single sentence.'
         expected = [
             [
-                ['Single', ' ', 'sentence', '.'],
-                [' ', ' '],
-                ['\t'],
-                ['Next', ' ', 'single', ' ', 'sentence', '.']
+                [u'Single', u' ', u'sentence', u'.'],
+                [u' ', u' '],
+                [u'\t'],
+                [u'Next', u' ', u'single', u' ', u'sentence', u'.']
             ]
         ]
         result = tokenize_dataset(source)
@@ -49,14 +44,9 @@ class TestTokenizeDataset(unittest.TestCase):
 
 class TestMakeDataset(unittest.TestCase):
     def setUp(self):
-        self.random = Random(0)
+        np.random.seed(1)
 
-    @mock.patch('tfdsbd.convert.random')
-    def testDocNoDot(self, random):
-        random.randint._mock_side_effect = self.random.randint
-        random.shuffle._mock_side_effect = self.random.shuffle
-        random.expovariate._mock_side_effect = self.random.expovariate
-
+    def testDocNoDot(self):
         source = [
             [
                 ['First', ' ', 'sentence', ' ', 'without', ' ', 'dot'],
@@ -70,66 +60,40 @@ class TestMakeDataset(unittest.TestCase):
         ]
 
         expected_documents = [
-            u'First  sentence without dot ' +
-            u'Second "sentence!" ' +
-            u'Third  sentence. ' +
-            u'Первое предложение в  параграфе\n' +
-            u'Second sentence\nin paragraph.',
+            'First         sentence   without        dot   ' +
+            'Second  "sentence!"     ' +
+            'Third sentence.',
 
-            u'First sentence without   dot\t' +
-            u'Second "sentence!" ' +
-            u'Third sentence. ' +
-            u'Первое  предложение в параграфе\n' +
-            u'Second sentence in paragraph.'
+            u'Первое предложение   в    параграфе ' +
+            'Second    sentence   in  paragraph.',
+
+            'First sentence  without     dot\n' +
+            'Second  "sentence!"  ' +
+            'Third    sentence. ',
+
+            u'Первое предложение в        параграфе\n\n' +
+            'Second sentence  in  paragraph.  '
         ]
         expected_labels = [
             [
-                0, 0, 0, 0, 0, 0, 0, 0, 1,
-                0, 0, 0, 0, 0, 0, 1,
-                0, 0, 0, 0, 0, 1,
-                0, 0, 0, 0, 0, 0, 0, 0, 1,
-                0, 0, 0, 0, 0, 0, 0, 0
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1,
+                0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1,
+                0, 0, 0, 0
             ],
             [
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
-                0, 0, 0, 0, 0, 0, 1,
-                0, 0, 0, 0, 1,
-                0, 0, 0, 0, 0, 0, 0, 0, 1,
-                0, 0, 0, 0, 0, 0, 0, 0
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ],
+            [
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1,
+                0, 0, 0, 0, 0, 0, 0, 1, 1,
+                0, 0, 0, 0, 0, 0, 0, 1
+            ],
+            [
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1
             ]
         ]
-
-        if sys.version_info.major == 3:
-            expected_documents = [
-                u'First sentence without  dot\n' +
-                u'Second "sentence!" ' +
-                u'Third sentence.\t' +
-                u'Первое предложение в  параграфе\n' +
-                u'Second sentence in  paragraph.',
-
-                u'First  sentence without dot ' +
-                u'Second "sentence!" ' +
-                u'Third  sentence. ' +
-                u'Первое предложение в  параграфе\n' +
-                u'Second sentence in paragraph.'
-            ]
-            expected_labels = [
-                [
-                    0, 0, 0, 0, 0, 0, 0, 0, 1,
-                    0, 0, 0, 0, 0, 0, 1,
-                    0, 0, 0, 0, 1,
-                    0, 0, 0, 0, 0, 0, 0, 0, 1,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0
-                ],
-                [
-                    0, 0, 0, 0, 0, 0, 0, 0, 1,
-                    0, 0, 0, 0, 0, 0, 1,
-                    0, 0, 0, 0, 0, 1,
-                    0, 0, 0, 0, 0, 0, 0, 0, 1,
-                    0, 0, 0, 0, 0, 0, 0, 0
-                ]
-            ]
-        expected_documents = [_.encode('utf-8') for _ in expected_documents]
 
         result = make_dataset(source, doc_size=2, num_repeats=2)
         result_documents, result_labels = zip(*result)
@@ -137,6 +101,38 @@ class TestMakeDataset(unittest.TestCase):
 
         self.assertEqual(expected_documents, result_documents)
         self.assertEqual(expected_labels, result_labels)
+
+
+class TestExtractVocab(unittest.TestCase):
+    def setUp(self):
+        np.random.seed(1)
+
+    def testNormal(self):
+        source = make_dataset([
+            [
+                [u'Single', u' ', u'sentence', u'.'],
+            ],
+            [
+                [u'First', u' ', u'sentence', u' ', u'in', u' ', u'paragraph', u'.'],
+                [u'Second', u' ', u'sentence', u' ', u'in', u' ', u'paragraph', u'.'],
+            ],
+        ], doc_size=2, num_repeats=1)
+        expected = ['< >', '<se', '<.>', '<sen', '<sent', '<sente', '<sentence>', 'ce>', 'ence>', 'nce>', 'tence>']
+        result = extract_vocab(source, 3, 6, 3)
+        self.assertEqual(expected, result.items())
+
+    def testNewlines(self):
+        source = make_dataset([
+            [
+                [u'Single', ' ', u'sentence'],
+            ],
+            [
+                [u'First', ' ', u'sentence', ' ', u'in', ' ', u'paragraph'],
+                [u'Second', ' ', u'sentence', ' ', u'in', ' ', u'paragraph'],
+            ],
+        ], doc_size=3, num_repeats=2)
+        result = extract_vocab(source, 3, 6, 2)
+        self.assertTrue('<\n>' in result.items())
 
 
 class TestWriteDataset(tf.test.TestCase):
@@ -210,7 +206,3 @@ class TestWriteDataset(tf.test.TestCase):
             document, labels = sess.run(next_element)
             self.assertEqual(source[1][0].encode('utf-8'), document)
             self.assertEqual(source[1][1], list(labels))
-
-
-if __name__ == "__main__":
-    unittest.main()

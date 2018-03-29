@@ -5,7 +5,7 @@ from __future__ import print_function
 import numpy as np
 import tensorflow as tf
 from tensorflow.python.framework import ops
-from sentsegm.metric import f1_score
+from ..metric import f1_score
 
 
 class TestF1Score(tf.test.TestCase):
@@ -217,7 +217,3 @@ class TestF1Score(tf.test.TestCase):
             sess.run(tf.local_variables_initializer())
             sess.run(update_f1)
             self.assertEqual(1.0, f1_value.eval())
-
-
-if __name__ == '__main__':
-    tf.test.main()

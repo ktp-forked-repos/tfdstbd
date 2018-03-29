@@ -3,75 +3,120 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
+from tfucops import transform_normalize_unicode, expand_split_words, transform_lower_case, transform_zero_digits, \
+    transform_wrap_with, expand_char_ngrams
+from .transform import extract_features, extract_ngrams
 from .metric import f1_score
 
 
-def model_fn(features, labels, mode, params):
-    """The model_fn argument for creating an Estimator."""
+def sbd_model_fn(features, labels, mode, params):
+    docs = features['documents']
 
-    def _get_input_tensors(features, labels):
-        """Converts the input dict into tokens, lengths, and labels tensors."""
-        return features['tokens'], features['length'], labels
+    # Add tokinization layer
+    with tf.name_scope('tokens'):
+        # Normalize unicode documents with NFC algorithm
+        docs = transform_normalize_unicode(docs, 'NFC')
+        max_docs = tf.size(docs)
 
-    def _add_embed_layers(tokens):
-        """Adds embedding layers."""
-        # words = tf.constant(params.vocab_words)
-        vocab = tf.contrib.lookup.index_table_from_tensor(
-            mapping=params.vocab_words,
-            num_oov_buckets=1,  # unique tokens all-in-one
+        # Split documents to tokens
+        tokens = expand_split_words(docs, default='')
+
+        # Compute padded tokens mask
+        tokens_masks = tf.cast(tf.not_equal(tokens, ''), dtype=tf.int32)
+
+        # Compute actual documents shape (in term of tokens)
+        tokens_lengths = tf.reduce_sum(tokens_masks, axis=-1)
+        max_tokens = tf.reduce_max(tokens_lengths)
+
+    # Add ngrams extraction layer
+    with tf.name_scope('ngrams'):
+        # Split tokens to ngrams
+        ngrams = extract_ngrams(tokens, params.min_n, params.max_n)
+
+        # Compute padded ngrams mask
+        ngrams_masks = tf.cast(tf.not_equal(ngrams, ''), dtype=tf.int32)
+
+        # Compute actual documents shape (in term of ngrams)
+        ngrams_lengths = tf.reduce_sum(ngrams_masks, axis=-1)
+        max_ngrams = tf.reduce_max(ngrams_lengths)
+
+        # Reshape ngrams to flat list, required to use feature columns
+        ngrams = tf.reshape(ngrams, [-1])
+
+    # Add ngrams embedding layer
+    with tf.name_scope('embedings'):
+
+        # Pass ngrams through features input layer
+        # hashed_column = tf.feature_column.categorical_column_with_hash_bucket(
+        #     key='ngrams',
+        #     hash_bucket_size=1000000
+        # )
+        vocab_column = tf.feature_column.categorical_column_with_vocabulary_list(
+            key='ngrams',
+            vocabulary_list=params.ngram_vocab,
+            num_oov_buckets=1000
         )
-        ids = vocab.lookup(tokens)  # tokens -> ids
-        embeddings = tf.contrib.layers.embed_sequence(
-            ids=ids,
-            vocab_size=len(params.vocab_words) + 1,  # or size + 1 ?
-            # vocab_size=vocab.size(),  # or size + 1 ?
-            embed_dim=params.embed_size,
+        embedding_column = tf.feature_column.embedding_column(
+            categorical_column=vocab_column,
+            dimension=params.embed_size
         )
-        return embeddings
+        embeddings = tf.feature_column.input_layer({
+            'ngrams': ngrams
+        }, [embedding_column])
 
-    def _add_rnn_layers(embedded, lengths):
-        """Adds recurrent neural network layers."""
+        # Reshape embeddings to original ngrmas shape
+        embeddings = tf.reshape(embeddings, [max_docs, max_tokens, max_ngrams, params.embed_size])
+
+        # Mask padded ngrams
+        embeddings = tf.multiply(embeddings, tf.expand_dims(tf.cast(ngrams_masks, tf.float32), -1))
+
+        # Compute mean for ngrams to get token embeddings
+        embeddings = tf.reduce_sum(embeddings, axis=-2)
+        embeddings = tf.divide(embeddings, tf.expand_dims(tf.cast(ngrams_lengths, dtype=tf.float32), -1))
+
+    # Add feature extraction layer
+    with tf.name_scope('features'):
+        features = extract_features(tokens)
+
+    # Add embedding+features layer
+    with tf.name_scope('concat'):
+        features_size = 4
+        inputs = tf.concat([embeddings, features], axis=-1)
+
+    # Add recurrent layer
+    with tf.name_scope('rnn'):
         cells_fw = [tf.contrib.rnn.GRUCell(params.rnn_size) for _ in range(params.rnn_layers)]
         cells_bw = [tf.contrib.rnn.GRUCell(params.rnn_size) for _ in range(params.rnn_layers)]
-        # if mode == tf.estimator.ModeKeys.TRAIN:
-        #     cells_fw = [tf.contrib.rnn.DropoutWrapper(cell, output_keep_prob=params.keep_prob) for cell in cells_fw]
-        #     cells_bw = [tf.contrib.rnn.DropoutWrapper(cell, output_keep_prob=params.keep_prob) for cell in cells_bw]
-        outputs, _, _ = tf.contrib.rnn.stack_bidirectional_dynamic_rnn(
+        if mode == tf.estimator.ModeKeys.TRAIN and params.keep_prob < 1:
+            cells_fw = [tf.contrib.rnn.DropoutWrapper(cell, output_keep_prob=params.keep_prob) for cell in cells_fw]
+            cells_bw = [tf.contrib.rnn.DropoutWrapper(cell, output_keep_prob=params.keep_prob) for cell in cells_bw]
+        rnn_directions = 2
+        rnn_output, _, _ = tf.contrib.rnn.stack_bidirectional_dynamic_rnn(
             cells_fw=cells_fw,
             cells_bw=cells_bw,
-            inputs=embedded,
-            sequence_length=lengths,
+            inputs=inputs,
+            sequence_length=tokens_lengths,
             dtype=tf.float32
         )
-        return outputs
 
-    def _add_fc_layers(final_state):
-        """Adds a fully connected layer."""
-        batch_size = tf.shape(final_state)[0]
-        max_length = tf.shape(final_state)[1]
-
+    # Add fully-connected layer
+    with tf.name_scope('dense'):
         # Flatten to apply same weights to all time steps
-        flat = tf.reshape(final_state, [
+        flat = tf.reshape(rnn_output, [
             -1,
-            params.rnn_size * 2
+            params.rnn_size * rnn_directions
         ])
+        num_classes = 2
         logits = tf.layers.dense(
             inputs=flat,
-            units=2,  # nuber of classes
+            units=num_classes,
             activation=None  # or with activation?
         )
         logits = tf.reshape(logits, [
-            batch_size,
-            max_length,
-            2  # number of classes
+            max_docs,
+            max_tokens,
+            num_classes
         ])
-        return logits
-
-    # Build the model.
-    tokens, lengths, labels = _get_input_tensors(features, labels)
-    embeddings = _add_embed_layers(tokens)
-    final_state = _add_rnn_layers(embeddings, lengths)
-    logits = _add_fc_layers(final_state)
 
     # Build EstimatorSpec's
     if mode == tf.estimator.ModeKeys.PREDICT:
@@ -83,54 +128,53 @@ def model_fn(features, labels, mode, params):
         return tf.estimator.EstimatorSpec(
             mode=tf.estimator.ModeKeys.PREDICT,
             predictions=predictions,
-            # export_outputs={
-            #     'classify': tf.estimator.export.PredictOutput(predictions)
-            # }
         )
 
-    # Add the loss.
-    mask = tf.sequence_mask(lengths, tf.reduce_max(lengths))
-    mask = tf.cast(mask, dtype=tf.int32)
+    # Add the loss
     loss = tf.losses.sparse_softmax_cross_entropy(
         labels=labels,
         logits=logits,
-        weights=mask  # 0 for padded tokens, should reduce padded examples loss to 0
+        weights=tokens_masks
     )
 
     # Add metrics
-    accuracy = tf.metrics.accuracy(
-        labels=labels,
-        predictions=tf.argmax(logits, axis=2),
-    )
-    f1 = f1_score(
-        labels=labels,
-        predictions=tf.argmax(logits, axis=2),
-    )
+    with tf.name_scope('metrics'):
+        accuracy_metric = tf.metrics.accuracy(
+            labels=labels,
+            predictions=tf.argmax(logits, axis=2),
+        )
+        f1_metric = f1_score(
+            labels=labels,
+            predictions=tf.argmax(logits, axis=2),
+        )
 
     if mode == tf.estimator.ModeKeys.EVAL:
         return tf.estimator.EstimatorSpec(
             mode=tf.estimator.ModeKeys.EVAL,
             loss=loss,
             eval_metric_ops={
-                'accuracy': accuracy,
-                'f1': f1
+                'accuracy': accuracy_metric,
+                'f1': f1_metric
             }
         )
 
-    # Add the optimizer.
+    # Add the optimizer
     train_op = tf.contrib.layers.optimize_loss(
         loss=loss,
         global_step=tf.train.get_global_step(),
         learning_rate=params.learning_rate,
         optimizer='Adam',
-        # summaries=['learning_rate', 'loss']
     )
-    tf.summary.scalar('accuracy', accuracy[1])
-    tf.summary.scalar('f1_score', f1[1])
 
-    if mode == tf.estimator.ModeKeys.TRAIN:
-        return tf.estimator.EstimatorSpec(
-            mode=tf.estimator.ModeKeys.TRAIN,
-            loss=loss,
-            train_op=train_op
-        )
+    assert mode == tf.estimator.ModeKeys.TRAIN
+    metrics_hook = tf.train.LoggingTensorHook({
+        'accuracy': accuracy_metric[1],
+        'f1': f1_metric[1]
+    }, every_n_iter=100)
+
+    return tf.estimator.EstimatorSpec(
+        mode=tf.estimator.ModeKeys.TRAIN,
+        loss=loss,
+        train_op=train_op,
+        training_hooks=[metrics_hook]
+    )

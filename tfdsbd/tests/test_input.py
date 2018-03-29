@@ -5,7 +5,7 @@ from __future__ import print_function
 
 import os
 import tensorflow as tf
-from tfdsbd.input import train_input_fn, predict_input_fn
+from ..input import train_input_fn, predict_input_fn
 
 
 class TestTrainInputFn(tf.test.TestCase):
@@ -20,10 +20,9 @@ class TestTrainInputFn(tf.test.TestCase):
         with self.test_session() as sess:
             features, labels = sess.run(features)
             self.assertEqual(type(features), dict)
-            self.assertEqual(sorted(features.keys()), ['document', 'length', 'tokens'])
-            self.assertEqual(len(features['document']), batch_size)
-            self.assertEqual(list(features['length']), [92, 112])
-            self.assertEqual([len(_) for _ in labels], [112, 112])
+            self.assertEqual(sorted(features.keys()), ['documents'])
+            self.assertEqual(len(features['documents']), batch_size)
+            self.assertEqual([len(_) for _ in labels], [64, 64])
 
 
 class TestPredictInputFn(tf.test.TestCase):
@@ -47,9 +46,8 @@ class TestPredictInputFn(tf.test.TestCase):
         with self.test_session() as sess:
             result = sess.run(features)
             self.assertEqual(type(result), dict)
-            self.assertEqual(sorted(result.keys()), ['document', 'length', 'tokens'])
-            self.assertEqual(len(result['document']), 1)
-            self.assertEqual(result['length'], 99)
+            self.assertEqual(sorted(result.keys()), ['documents'])
+            self.assertEqual(len(result['documents']), 1)
 
 
 if __name__ == "__main__":

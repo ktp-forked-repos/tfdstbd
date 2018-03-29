@@ -6,9 +6,10 @@ import os
 
 import tensorflow as tf
 
-from .model import model_fn
+from .estimator import SBDEstimator
 from .vocab import Vocabulary
 from .input import train_input_fn, predict_input_fn
+from .hook import MetadataHook
 
 # CompiledWrapper
 # https://www.tensorflow.org/api_guides/python/contrib.seq2seq
@@ -31,31 +32,30 @@ data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')
 vocab_filename = os.path.join(data_dir, 'vocabulary.pkl')
 vocab = Vocabulary.load(vocab_filename)
 
-# Prepare model params
-params = tf.contrib.training.HParams(
-    embed_size=50,
-    rnn_layers=1,
-    rnn_size=128,
-    keep_prob=0.8,
-    vocab_words=vocab.items(),
-    learning_rate=0.001,
-)
-
 # Create estimator
 model_dir = os.path.join(os.path.dirname(__file__), '..', 'model')
-estimator = tf.estimator.Estimator(
-    model_fn=model_fn,
+estimator = SBDEstimator(
+    min_n=3,
+    max_n=4,
+    ngram_vocab=vocab.items(),
+    embed_size=50,
+    rnn_size=128,
+    rnn_layers=1,
+    keep_prob=0.8,
+    learning_rate=0.001,
     model_dir=model_dir,
-    params=params
 )
 
 # Run training
+# hook = MetadataHook(save_steps=1, output_dir=model_dir)
+# models/official/utils/logging/metric_hook.py
+# hook2 = tf.train.ProfilerHook(save_steps=5, output_dir='.')
 train_wildcard = os.path.join(data_dir, 'train*.tfrecords.gz')
-estimator.train(input_fn=lambda: train_input_fn(train_wildcard, batch_size=50))
+estimator.train(input_fn=lambda: train_input_fn(train_wildcard, batch_size=1))
 
 # Run evaluation
 eval_wildcard = os.path.join(data_dir, 'valid*.tfrecords.gz')
-metrics = estimator.evaluate(input_fn=lambda: train_input_fn('', batch_size=50))
+metrics = estimator.evaluate(input_fn=lambda: train_input_fn('', batch_size=1))
 print(metrics)
 
 # Run prediction
