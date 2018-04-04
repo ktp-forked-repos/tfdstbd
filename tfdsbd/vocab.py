@@ -18,7 +18,7 @@ class Vocabulary:
         self._cnt.update(items)
 
     def trim(self, min_freq):
-        for word in self.items():
+        for word in list(self._cnt.keys()):
             if self._cnt[word] < min_freq:
                 del self._cnt[word]
 
@@ -50,7 +50,7 @@ class Vocabulary:
                 line = u'{}\t{}\n'.format(_safe('token'), _safe('frequency'))
                 fout.write(line)
             for w in self.items():
-                line = u'{}\t{}\n'.format(_safe(w), _safe(self._cnt[w]))
+                line = u'{}\t{}\n'.format(_safe(w.decode('utf-8')), _safe(self._cnt[w]))
                 fout.write(line)
 
     @staticmethod

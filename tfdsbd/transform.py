@@ -3,7 +3,8 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from tfucops import transform_lower_case, transform_upper_case, expand_split_chars, transform_normalize_unicode, transform_zero_digits, transform_wrap_with, expand_char_ngrams
+from tfucops import transform_lower_case, transform_upper_case, expand_split_chars, transform_normalize_unicode, \
+    transform_zero_digits, transform_wrap_with, expand_char_ngrams
 
 
 def extract_features(tokens_source):
@@ -16,7 +17,8 @@ def extract_features(tokens_source):
     feat_lower_case = tf.logical_and(has_case, tf.equal(tokens_lower, tokens_source))
     feat_upper_case = tf.logical_and(has_case, tf.equal(tokens_upper, tokens_source))
 
-    chars_source = expand_split_chars(tokens_source, default='')
+    chars_sparse = expand_split_chars(tokens_source)
+    chars_source = tf.sparse_tensor_to_dense(chars_sparse, default_value='')  # TODO
 
     chars_shape_size = tf.size(tf.shape(chars_source))
 
@@ -68,20 +70,20 @@ def extract_features(tokens_source):
     return tf.stack(all_features, axis=-1)
 
 
-def extract_ngrams(tokens_source, minn, maxn):
+def extract_ngrams(tokens, minn, maxn):
     # Normalize unicode tokens with NFD algorithm
-    tokens = transform_normalize_unicode(tokens_source, 'NFKC')
+    ugly = transform_normalize_unicode(tokens, 'NFKC')
 
     # Make tokens case lower
-    tokens = transform_lower_case(tokens)
+    ugly = transform_lower_case(ugly)
 
     # Replace each digit with 0
-    tokens = transform_zero_digits(tokens)
+    ugly = transform_zero_digits(ugly)
 
     # Add start & end character to each token
-    tokens = transform_wrap_with(tokens, '<', '>')
+    ugly = transform_wrap_with(ugly, '<', '>')
 
     # Extract character ngrams with word itself
-    ngrams = expand_char_ngrams(tokens, minn, maxn, itself='ALWAYS')
+    ngrams = expand_char_ngrams(ugly, minn, maxn, itself='ALWAYS')
 
     return ngrams

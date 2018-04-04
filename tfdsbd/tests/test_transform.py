@@ -33,6 +33,8 @@ class TestExtractNgrams(tf.test.TestCase):
             ['<к', 'км', 'м0', '0>', '<км', 'км0', 'м0>', '<км0>', '', '', '', '', '', '', '', ''],
         ])
         result = extract_ngrams(source, 2, 3)
+        result = tf.sparse_tensor_to_dense(result, default_value='')
+
 
         with self.test_session() as sess:
             expected, result = sess.run([expected, result])

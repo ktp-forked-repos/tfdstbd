@@ -15,7 +15,7 @@ setup(
     packages=['tfdsbd'],
     install_requires=[
         'tensorflow>=1.6.0',
-        'tfucops>=1.3.0'
+        'tfucops>=1.4.2'
     ],
     test_suite='nose.collector',
     tests_require=['nose']

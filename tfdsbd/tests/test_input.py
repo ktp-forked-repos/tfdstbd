@@ -22,7 +22,7 @@ class TestTrainInputFn(tf.test.TestCase):
             self.assertEqual(type(features), dict)
             self.assertEqual(sorted(features.keys()), ['documents'])
             self.assertEqual(len(features['documents']), batch_size)
-            self.assertEqual([len(_) for _ in labels], [64, 64])
+            self.assertEqual([len(_) for _ in labels], [193, 193])
 
 
 class TestPredictInputFn(tf.test.TestCase):

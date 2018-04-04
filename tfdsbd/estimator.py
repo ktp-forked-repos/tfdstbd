@@ -12,6 +12,7 @@ class SBDEstimator(estimator.Estimator):
                  min_n,  # minimum ngram length
                  max_n,  # maximum ngram length
                  ngram_vocab,  # list of vocabulary ngrams
+                 uniq_count, # number of uniq ngrams buckets
                  embed_size,  # size of char embedding
                  rnn_size,  # size of single RNN layer
                  rnn_layers,  # number of RNN layers
@@ -23,6 +24,7 @@ class SBDEstimator(estimator.Estimator):
             min_n=min_n,
             max_n=max_n,
             ngram_vocab=ngram_vocab,
+            uniq_count=uniq_count,
             embed_size=embed_size,
             rnn_size=rnn_size,
             rnn_layers=rnn_layers,

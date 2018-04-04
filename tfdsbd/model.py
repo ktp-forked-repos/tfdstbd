@@ -19,7 +19,8 @@ def sbd_model_fn(features, labels, mode, params):
         max_docs = tf.size(docs)
 
         # Split documents to tokens
-        tokens = expand_split_words(docs, default='')
+        tokens = expand_split_words(docs)
+        tokens = tf.sparse_tensor_to_dense(tokens, default_value='')
 
         # Compute padded tokens mask
         tokens_masks = tf.cast(tf.not_equal(tokens, ''), dtype=tf.int32)
@@ -32,6 +33,7 @@ def sbd_model_fn(features, labels, mode, params):
     with tf.name_scope('ngrams'):
         # Split tokens to ngrams
         ngrams = extract_ngrams(tokens, params.min_n, params.max_n)
+        ngrams = tf.sparse_tensor_to_dense(ngrams, default_value='')
 
         # Compute padded ngrams mask
         ngrams_masks = tf.cast(tf.not_equal(ngrams, ''), dtype=tf.int32)
@@ -45,7 +47,6 @@ def sbd_model_fn(features, labels, mode, params):
 
     # Add ngrams embedding layer
     with tf.name_scope('embedings'):
-
         # Pass ngrams through features input layer
         # hashed_column = tf.feature_column.categorical_column_with_hash_bucket(
         #     key='ngrams',
@@ -54,7 +55,7 @@ def sbd_model_fn(features, labels, mode, params):
         vocab_column = tf.feature_column.categorical_column_with_vocabulary_list(
             key='ngrams',
             vocabulary_list=params.ngram_vocab,
-            num_oov_buckets=1000
+            num_oov_buckets=params.uniq_count
         )
         embedding_column = tf.feature_column.embedding_column(
             categorical_column=vocab_column,
@@ -131,11 +132,13 @@ def sbd_model_fn(features, labels, mode, params):
         )
 
     # Add the loss
-    loss = tf.losses.sparse_softmax_cross_entropy(
-        labels=labels,
-        logits=logits,
-        weights=tokens_masks
-    )
+    with tf.name_scope('loss'):
+        # loss = tf.losses.sigmoid_cross_entropy(
+        loss = tf.losses.sparse_softmax_cross_entropy(
+            labels=labels,
+            logits=logits,
+            weights=tokens_masks
+        )
 
     # Add metrics
     with tf.name_scope('metrics'):
@@ -159,12 +162,13 @@ def sbd_model_fn(features, labels, mode, params):
         )
 
     # Add the optimizer
-    train_op = tf.contrib.layers.optimize_loss(
-        loss=loss,
-        global_step=tf.train.get_global_step(),
-        learning_rate=params.learning_rate,
-        optimizer='Adam',
-    )
+    with tf.name_scope('train'):
+        train_op = tf.contrib.layers.optimize_loss(
+            loss=loss,
+            global_step=tf.train.get_global_step(),
+            learning_rate=params.learning_rate,
+            optimizer='Adam',
+        )
 
     assert mode == tf.estimator.ModeKeys.TRAIN
     metrics_hook = tf.train.LoggingTensorHook({

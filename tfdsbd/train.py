@@ -24,6 +24,8 @@ from .hook import MetadataHook
 
 # translit http://userguide.icu-project.org/transforms/general
 
+# from tensorflow.contrib.learn import DynamicRnnEstimator
+
 # Preparing
 tf.logging.set_verbosity(tf.logging.INFO)
 data_dir = os.path.join(os.path.dirname(__file__), '..', 'data')
@@ -38,11 +40,12 @@ estimator = SBDEstimator(
     min_n=3,
     max_n=4,
     ngram_vocab=vocab.items(),
+    uniq_count=1000,
     embed_size=50,
-    rnn_size=128,
+    rnn_size=32,
     rnn_layers=1,
     keep_prob=0.8,
-    learning_rate=0.001,
+    learning_rate=0.01,
     model_dir=model_dir,
 )
 
@@ -51,11 +54,11 @@ estimator = SBDEstimator(
 # models/official/utils/logging/metric_hook.py
 # hook2 = tf.train.ProfilerHook(save_steps=5, output_dir='.')
 train_wildcard = os.path.join(data_dir, 'train*.tfrecords.gz')
-estimator.train(input_fn=lambda: train_input_fn(train_wildcard, batch_size=1))
+estimator.train(input_fn=lambda: train_input_fn(train_wildcard, batch_size=5))
 
 # Run evaluation
 eval_wildcard = os.path.join(data_dir, 'valid*.tfrecords.gz')
-metrics = estimator.evaluate(input_fn=lambda: train_input_fn('', batch_size=1))
+metrics = estimator.evaluate(input_fn=lambda: train_input_fn(eval_wildcard, batch_size=5))
 print(metrics)
 
 # Run prediction

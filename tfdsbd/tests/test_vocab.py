@@ -19,20 +19,20 @@ class TestVocabulary(unittest.TestCase):
 
     def testFit(self):
         vocab = Vocabulary()
-        vocab.fit(['1', ' ', '2', ' ', '1', '\n', '2', '\t', '3', '.'])
-        self.assertEqual(vocab.items(), [' ', '1', '2', '\t', '\n', '.', '3'])
+        vocab.fit([b'1', b' ', b'2', b' ', b'1', b'\n', b'2', b'\t', b'3', b'.'])
+        self.assertEqual(vocab.items(), [b' ', b'1', b'2', b'\t', b'\n', b'.', b'3'])
 
     def testFitTrim(self):
         vocab = Vocabulary()
-        vocab.fit(['1', ' ', '2', ' ', '1', '\n', '2', '\t', '3', '.'])
+        vocab.fit([b'1', b' ', b'2', b' ', b'1', b'\n', b'2', b'\t', b'3', b'.'])
         vocab.trim(2)
-        self.assertEqual(vocab.items(), [' ', '1', '2'])
+        self.assertEqual(vocab.items(), [b' ', b'1', b'2'])
 
     def testSaveLoad(self):
         vocab_filename = os.path.join(self.temp_dir, 'vocab.pkl')
 
         vocab1 = Vocabulary()
-        vocab1.fit(['1', ' ', '2', ' ', '1', '\n', '2', '\t', '3', '.'])
+        vocab1.fit([b'1', b' ', b'2', b' ', b'1', b'\n', b'2', b'\t', b'3', b'.'])
         vocab1.save(vocab_filename)
 
         vocab2 = Vocabulary.load(vocab_filename)
@@ -45,7 +45,7 @@ class TestVocabulary(unittest.TestCase):
         vocab_filename = os.path.join(self.temp_dir, 'vocab.tsv')
 
         vocab = Vocabulary()
-        vocab.fit(['1', ' ', u'2', ' ', '1', '\n', '2', '\t', u'а', '.'])
+        vocab.fit([b'1', b' ', b'2', b' ', b'1', b'\n', b'2', b'\t', u'а'.encode('utf-8'), b'.'])
         vocab.export(vocab_filename)
         expected = u'token\tfrequency\n[32]\t2\n1\t2\n2\t2\n[9]\t1\n[10]\t1\n.\t1\nа\t1\n'
 

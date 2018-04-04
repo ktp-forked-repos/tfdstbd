@@ -8,11 +8,8 @@ import tensorflow as tf
 def train_input_fn(wildcard, batch_size):
     with tf.name_scope('input'):
         # Create dataset from multiple TFRecords files
-        files = tf.data.TFRecordDataset.list_files(wildcard)
-        dataset = files.interleave(
-            lambda file: tf.data.TFRecordDataset(file, compression_type='GZIP'),
-            cycle_length=3
-        )
+        files = tf.data.Dataset.list_files(wildcard)
+        dataset = tf.data.TFRecordDataset(files, compression_type='GZIP', num_parallel_reads=3)
 
         # Parse serialized examples
         def _parse_example(example_proto):
@@ -26,6 +23,17 @@ def train_input_fn(wildcard, batch_size):
             return {'documents': example['document'][0]}, example['labels']
 
         dataset = dataset.map(_parse_example)
+
+        # def sequence_length(features, labels):
+        #     return tf.size(labels)
+        #
+        # dataset = dataset.apply(tf.contrib.data.bucket_by_sequence_length(
+        #     element_length_func=sequence_length,
+        #     bucket_boundaries=[],
+        #     bucket_batch_sizes=[batch_size],
+        #     padded_shapes=({'documents': []}, [None]),
+        #     padding_values=({'documents': ''}, tf.cast(0, dtype=tf.int64))
+        # ))
 
         # Create padded batch
         dataset = dataset.padded_batch(
