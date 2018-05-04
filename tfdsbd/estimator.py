@@ -16,6 +16,7 @@ class SBDEstimator(estimator.Estimator):
                  embed_size,  # size of char embedding
                  rnn_size,  # size of single RNN layer
                  rnn_layers,  # number of RNN layers
+                 use_cudnn,  # use Cudnn LSTM
                  keep_prob,  # 1 - dropout probability
                  learning_rate,  # learning rate
                  model_dir=None,
@@ -28,9 +29,9 @@ class SBDEstimator(estimator.Estimator):
             embed_size=embed_size,
             rnn_size=rnn_size,
             rnn_layers=rnn_layers,
+            use_cudnn=use_cudnn,
             keep_prob=keep_prob,
             learning_rate=learning_rate,
-            use_cudnn=True,
         )
 
         super(SBDEstimator, self).__init__(

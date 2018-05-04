@@ -18,24 +18,18 @@ def main(argv):
     vocab_filename = os.path.join(FLAGS.data_path, 'vocabulary.pkl')
     vocab = Vocabulary.load(vocab_filename)
 
-    # Create estimator
-    # config = None # todo
-    # {
-    # _save_checkpoints_secs:3600,
-    # _keep_checkpoint_max:2,
-    # }
     estimator = SBDEstimator(
-        min_n=3,
-        max_n=4,
+        min_n=FLAGS.min_n,
+        max_n=FLAGS.max_n,
         ngram_vocab=vocab.items(),
-        uniq_count=1000,
-        embed_size=50,
-        rnn_size=64,
-        rnn_layers=1,
-        keep_prob=0.8,
-        learning_rate=0.01,
+        uniq_count=FLAGS.uniq_count,
+        embed_size=FLAGS.embed_size,
+        rnn_size=FLAGS.rnn_size,
+        rnn_layers=FLAGS.rnn_layers,
+        use_cudnn=FLAGS.use_cudnn,
+        keep_prob=FLAGS.keep_prob,
+        learning_rate=FLAGS.learning_rate,
         model_dir=FLAGS.model_path,
-        # config=config,
     )
 
     # Run training
@@ -48,6 +42,7 @@ def main(argv):
     metrics = estimator.evaluate(input_fn=lambda: train_input_fn(eval_wildcard, batch_size=5))
     print(metrics)
 
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description='Train and evaluate SBD model')
@@ -59,6 +54,51 @@ if __name__ == "__main__":
         'model_path',
         type=str,
         help='Path to store model')
+    parser.add_argument(
+        '-min_n',
+        type=int,
+        default=3,
+        help='Minimum ngram size')
+    parser.add_argument(
+        '-max_n',
+        type=int,
+        default=4,
+        help='Maximum ngram size')
+    parser.add_argument(
+        '-uniq_count',
+        type=int,
+        default=1000,
+        help='Number of <UNK> vocabulary items')
+    parser.add_argument(
+        '-embed_size',
+        type=int,
+        default=50,
+        help='Ngram embedding size')
+    parser.add_argument(
+        '-rnn_size',
+        type=int,
+        default=64,
+        help='RNN layer size')
+    parser.add_argument(
+        '-rnn_layers',
+        type=int,
+        default=1,
+        help='RNN layers count')
+    parser.add_argument(
+        '-use_cudnn',
+        type=bool,
+        default=True,
+        help='Use Cudnn LSTM vs TF LSTM')
+    parser.add_argument(
+        '-keep_prob',
+        type=float,
+        default=0.8,
+        help='RNN input keep probability')
+    parser.add_argument(
+        '-learning_rate',
+        type=float,
+        default=0.01,
+        help='Learning rate')
 
     FLAGS, unparsed = parser.parse_known_args()
     assert os.path.exists(FLAGS.data_path) and os.path.isdir(FLAGS.data_path)

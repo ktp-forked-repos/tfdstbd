@@ -142,7 +142,7 @@ if __name__ == "__main__":
         '-uniq_count',
         type=int,
         default=1000,
-        help='Proportion of vocabulary items to include as <UNK> label in TSV vocabulary')
+        help='Number of vocabulary items to include as <UNK> label in TSV vocabulary')
 
     FLAGS, unparsed = parser.parse_known_args()
     assert os.path.exists(FLAGS.src_path)
