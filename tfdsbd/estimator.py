@@ -12,12 +12,12 @@ class SBDEstimator(estimator.Estimator):
                  min_n,  # minimum ngram length
                  max_n,  # maximum ngram length
                  ngram_vocab,  # list of vocabulary ngrams
-                 uniq_count, # number of uniq ngrams buckets
+                 uniq_count,  # number of uniq ngrams buckets
                  embed_size,  # size of char embedding
                  rnn_size,  # size of single RNN layer
                  rnn_layers,  # number of RNN layers
                  keep_prob,  # 1 - dropout probability
-                 learning_rate, # learning rate
+                 learning_rate,  # learning rate
                  model_dir=None,
                  config=None):
         params = HParams(
@@ -30,6 +30,7 @@ class SBDEstimator(estimator.Estimator):
             rnn_layers=rnn_layers,
             keep_prob=keep_prob,
             learning_rate=learning_rate,
+            use_cudnn=True,
         )
 
         super(SBDEstimator, self).__init__(

@@ -10,10 +10,7 @@ import os
 import sys
 import tensorflow as tf
 from functools import partial
-from tfucops import expand_split_words, transform_normalize_unicode, transform_wrap_with, expand_char_ngrams
-from .input import train_input_fn
-from .vocab import Vocabulary
-from .transform import extract_ngrams
+from tfucops import expand_split_words, transform_normalize_unicode
 
 
 def tokenize_dataset(raw_paragraphs):
@@ -75,6 +72,8 @@ def make_dataset(tokenized_paragraphs, doc_size, num_repeats):
         X = []
         y = []
         for sentence in sample:
+            if len(sentence) > 1 and sentence[-2] == ' ' and sentence[-1] in ['.', '!', '?']:
+                sentence = sentence[:-2] + sentence[-1:]
             sentence = [not_boundary_glue() if token.isspace() else [token] for token in sentence]
             sentence = [token for token in sentence if len(token)]  # filter out empty tokens
             sentence = list(itertools.chain.from_iterable(sentence))
@@ -123,37 +122,6 @@ def write_dataset(dest_path, set_title, base_name, rec_size, set_data):
                 tfrecord_writer.write(create_example(document, labels))
 
 
-def extract_vocab(dest_path, set_title, base_name, minn, maxn, min_freq):
-    tf.reset_default_graph()
-
-    wildcard = os.path.join(dest_path, '{}-{}-*.tfrecords.gz'.format(set_title, base_name))
-    dataset = train_input_fn(wildcard, 10)
-    iterator = dataset.make_one_shot_iterator()
-    next_element = iterator.get_next()
-
-    docs = transform_normalize_unicode(next_element[0]['documents'], 'NFC')
-    tokens = expand_split_words(docs)
-    tokens = tf.sparse_tensor_to_dense(tokens, default_value='')
-    ngrams = extract_ngrams(tokens, minn, maxn)
-    ngrams = tf.reshape(ngrams.values, [-1])
-
-    vocab = Vocabulary()
-    with tf.Session() as sess:
-        # sess.run(iterator.initializer)
-        while True:
-            try:
-                result = sess.run(ngrams)
-            except tf.errors.OutOfRangeError:
-                break
-            result = [n for n in result if n != b'' and n != b'<>']
-            result = [n for n in result if not n.decode('utf-8').isalpha()]  # only non-alpha, including suffixes and postfixes
-            vocab.fit(result)
-            # vocab.trim(2)  # ngrams produce too large vocabulary
-    vocab.trim(min_freq)
-
-    return vocab
-
-
 def main(argv):
     del argv
 
@@ -190,17 +158,10 @@ def main(argv):
     write_dataset(FLAGS.dest_path, 'test', base_name, FLAGS.rec_size, test_dataset)
     del test_dataset
 
-    tf.logging.info('Processing training vocabulary with min freq {}'.format(FLAGS.min_freq))
-    vocab = extract_vocab(FLAGS.dest_path, 'train', base_name, FLAGS.min_n, FLAGS.max_n, FLAGS.min_freq)
-    vocab_filename = os.path.join(FLAGS.dest_path, 'vocabulary')
-    vocab.save(vocab_filename + '.pkl')
-    vocab.fit(['<UNK_{}>'.format(i).encode('utf-8') for i in range(FLAGS.uniq_count)])
-    vocab.export(vocab_filename + '.tsv')
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description='Create training/validation/test data from text files with paragraph markup')
+        description='Create training/validation/testing datasets from text files with paragraph markup')
     parser.add_argument(
         'src_file',
         type=argparse.FileType('rb'),
@@ -215,29 +176,9 @@ if __name__ == "__main__":
         default=500,
         help='Maximum paragraphs count per document')
     parser.add_argument(
-        '-min_n',
-        type=int,
-        default=3,
-        help='Minimum ngram size')
-    parser.add_argument(
-        '-max_n',
-        type=int,
-        default=4,
-        help='Maximum ngram size')
-    parser.add_argument(
-        '-min_freq',
-        type=int,
-        default=100,
-        help='Minimum ngram frequency to leave it in vocabulary')
-    parser.add_argument(
-        '-uniq_count',
-        type=int,
-        default=1000,
-        help='Proportion of vocabulary items to include as <UNK> label in TSV vocabulary')
-    parser.add_argument(
         '-rec_size',
         type=int,
-        default=5000,
+        default=1000,
         help='Maximum documents count per TFRecord file')
     parser.add_argument(
         '-valid_size',
@@ -258,9 +199,6 @@ if __name__ == "__main__":
     FLAGS, unparsed = parser.parse_known_args()
     assert not os.path.exists(FLAGS.dest_path) or os.path.isdir(FLAGS.dest_path)
     assert 0 < FLAGS.doc_size
-    assert 0 < FLAGS.min_n <= FLAGS.max_n
-    assert 0 <= FLAGS.min_freq
-    assert 0 < FLAGS.uniq_count
     assert 0 < FLAGS.rec_size
     assert 0 <= FLAGS.valid_size + FLAGS.test_size <= 1
     assert 0 < FLAGS.num_repeats

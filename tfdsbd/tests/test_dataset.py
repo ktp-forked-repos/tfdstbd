@@ -10,7 +10,7 @@ import tensorflow as tf
 import tempfile
 import unittest
 
-from ..prepare import tokenize_dataset, extract_vocab, make_dataset, write_dataset
+from ..dataset import tokenize_dataset, make_dataset, write_dataset
 from ..input import train_input_fn
 
 
@@ -165,46 +165,5 @@ class TestWriteDataset(tf.test.TestCase):
             features, labels = sess.run(next_element)
             self.assertEqual(source[1][0], features['documents'][0])
             self.assertEqual(source[1][1], labels[0].tolist())
-
-
-class TestExtractVocab(unittest.TestCase):
-    def setUp(self):
-        np.random.seed(1)
-        self.temp_dir = tempfile.mkdtemp()
-
-    def tearDown(self):
-        shutil.rmtree(self.temp_dir, ignore_errors=True)
-
-    def testNormal(self):
-        source = make_dataset([
-            [
-                [b'Single', b' ', b'sentence', b'.'],
-            ],
-            [
-                [b'First', b' ', b'sentence', b' ', b'in', b' ', b'paragraph', b'.'],
-                [b'Second', b' ', b'sentence', b' ', b'in', b' ', b'paragraph', b'.'],
-            ],
-        ], doc_size=2, num_repeats=1)
-        write_dataset(self.temp_dir, 'test', 'buffer', 100, source)
-
-        expected = [b'< >', b'<se', b'<.>', b'<sen', b'<sent', b'<sente', b'<sentence>', b'ce>', b'ence>', b'nce>',
-                    b'tence>']
-        result = extract_vocab(self.temp_dir, 'test', 'buffer', 3, 6, 3)
-        self.assertEqual(expected, result.items())
-
-    def testNewlines(self):
-        source = make_dataset([
-            [
-                [b'Single', ' ', b'sentence'],
-            ],
-            [
-                [b'First', ' ', b'sentence', ' ', b'in', ' ', b'paragraph'],
-                [b'Second', ' ', b'sentence', ' ', b'in', ' ', b'paragraph'],
-            ],
-        ], doc_size=3, num_repeats=2)
-        write_dataset(self.temp_dir, 'test', 'buffer', 100, source)
-
-        result = extract_vocab(self.temp_dir, 'test', 'buffer', 3, 6, 2)
-        self.assertTrue(b'<\n>' in result.items())
 
 

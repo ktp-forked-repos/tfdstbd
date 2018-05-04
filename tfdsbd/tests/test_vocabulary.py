@@ -4,10 +4,12 @@ from __future__ import division
 from __future__ import print_function
 
 import os
+import numpy as np
 import shutil
 import tempfile
 import unittest
-from ..vocab import Vocabulary
+from ..vocabulary import Vocabulary, extract_vocab
+from ..dataset import make_dataset, write_dataset
 
 
 class TestVocabulary(unittest.TestCase):
@@ -52,3 +54,46 @@ class TestVocabulary(unittest.TestCase):
         with open(vocab_filename, 'rb') as vf:
             result = vf.read().decode('utf-8')
         self.assertEqual(expected, result)
+
+
+class TestExtractVocab(unittest.TestCase):
+    def setUp(self):
+        np.random.seed(1)
+        self.temp_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    def testNormal(self):
+        source = make_dataset([
+            [
+                [b'Single', b' ', b'sentence', b'.'],
+            ],
+            [
+                [b'First', b' ', b'sentence', b' ', b'in', b' ', b'paragraph', b'.'],
+                [b'Second', b' ', b'sentence', b' ', b'in', b' ', b'paragraph', b'.'],
+            ],
+        ], doc_size=2, num_repeats=1)
+        write_dataset(self.temp_dir, 'train', 'buffer', 100, source)
+
+        expected = [b'< >', b'<se', b'<.>', b'<sen', b'<sent', b'<sente', b'<sentence>', b'ce>', b'ence>', b'nce>',
+                    b'tence>']
+        result = extract_vocab(self.temp_dir, 3, 6, 3)
+        self.assertEqual(expected, result.items())
+
+    def testNewlines(self):
+        source = make_dataset([
+            [
+                [b'Single', ' ', b'sentence'],
+            ],
+            [
+                [b'First', ' ', b'sentence', ' ', b'in', ' ', b'paragraph'],
+                [b'Second', ' ', b'sentence', ' ', b'in', ' ', b'paragraph'],
+            ],
+        ], doc_size=3, num_repeats=2)
+        write_dataset(self.temp_dir, 'train', 'buffer', 100, source)
+
+        result = extract_vocab(self.temp_dir, 3, 6, 2)
+        self.assertTrue(b'<\n>' in result.items())
+
+

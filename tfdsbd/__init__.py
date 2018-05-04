@@ -1,6 +1,56 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
+import hashlib
+import tensorflow as tf
+import sysconfig
+from os import path
+from tensorflow.python.framework import ops
+
+
+__VERSION__ = '0.1'
+
+
+def __load_lib():
+    uniq_flags = tf.sysconfig.get_compile_flags() + tf.sysconfig.get_link_flags() + [__VERSION__]
+    uniq_flags = '/'.join(uniq_flags).encode('utf-8')
+    flags_key = hashlib.md5(uniq_flags).hexdigest()
+
+    ext_suffix = sysconfig.get_config_var('EXT_SUFFIX')
+    if ext_suffix is None:
+        ext_suffix = sysconfig.get_config_var('SO')
+
+    lib_file = 'tfdsbd_{}{}'.format(flags_key, ext_suffix)
+    curr_dir = path.dirname(path.abspath(__file__))
+    lib_path = path.join(curr_dir, '..', lib_file)
+
+    if not path.exists(lib_path):
+        raise Exception('OP library ({}) for your TF installation not found. '.format(lib_path) +
+                        'Remove and install with "tfdsbd" package with --no-cache-dir option')
+
+    return tf.load_op_library(lib_path)
+
+
+_lib = __load_lib()
+
+
+def features_length_case(source):
+    """Extract length and case features from strings.
+
+    Args:
+        source: `Tensor` of any shape, strings to extract features.
+    Returns:
+        `Tensor` of source shape + 1 with float features.
+    """
+
+    source = tf.convert_to_tensor(source, dtype=tf.string)
+
+    return _lib.features_length_case(source)
+
+
+ops.NotDifferentiable("FeaturesLengthCase")
+
+
 
 # from tfdsbd.tfdsbd.internal.model import model_fn
 

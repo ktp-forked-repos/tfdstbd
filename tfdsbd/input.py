@@ -24,17 +24,6 @@ def train_input_fn(wildcard, batch_size):
 
         dataset = dataset.map(_parse_example)
 
-        # def sequence_length(features, labels):
-        #     return tf.size(labels)
-        #
-        # dataset = dataset.apply(tf.contrib.data.bucket_by_sequence_length(
-        #     element_length_func=sequence_length,
-        #     bucket_boundaries=[],
-        #     bucket_batch_sizes=[batch_size],
-        #     padded_shapes=({'documents': []}, [None]),
-        #     padding_values=({'documents': ''}, tf.cast(0, dtype=tf.int64))
-        # ))
-
         # Create padded batch
         dataset = dataset.padded_batch(
             batch_size,
