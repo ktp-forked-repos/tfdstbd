@@ -3,45 +3,45 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-# from .estimator import SBDEstimator
-# from .vocabulary import Vocabulary
-# from .input import train_input_fn, predict_input_fn
+from .estimator import SBDEstimator
+from .vocabulary import Vocabulary
+from .input import train_input_fn, predict_input_fn
 import argparse
-# import os
-# import sys
-# import tensorflow as tf
-#
-#
-# def main(argv):
-#     del argv
-#
-#     # Load vocabulary
-#     vocab_filename = os.path.join(FLAGS.data_path, 'vocabulary.pkl')
-#     vocab = Vocabulary.load(vocab_filename)
-#
-#     estimator = SBDEstimator(
-#         min_n=FLAGS.min_n,
-#         max_n=FLAGS.max_n,
-#         ngram_vocab=vocab.items(),
-#         uniq_count=FLAGS.uniq_count,
-#         embed_size=FLAGS.embed_size,
-#         rnn_size=FLAGS.rnn_size,
-#         rnn_layers=FLAGS.rnn_layers,
-#         use_cudnn=FLAGS.use_cudnn,
-#         keep_prob=FLAGS.keep_prob,
-#         learning_rate=FLAGS.learning_rate,
-#         model_dir=FLAGS.model_path,
-#     )
-#
-#     # Run training
-#     # hook = MetadataHook(save_steps=1, output_dir=model_dir)
-#     train_wildcard = os.path.join(FLAGS.data_path, 'train*.tfrecords.gz')
-#     estimator.train(input_fn=lambda: train_input_fn(train_wildcard, batch_size=5))
-#
-#     # Run evaluation
-#     eval_wildcard = os.path.join(FLAGS.data_path, 'valid*.tfrecords.gz')
-#     metrics = estimator.evaluate(input_fn=lambda: train_input_fn(eval_wildcard, batch_size=5))
-#     print(metrics)
+import os
+import sys
+import tensorflow as tf
+
+
+def main(argv):
+    del argv
+
+    # Load vocabulary
+    vocab_filename = os.path.join(FLAGS.data_path, 'vocabulary.pkl')
+    vocab = Vocabulary.load(vocab_filename)
+
+    estimator = SBDEstimator(
+        min_n=FLAGS.min_n,
+        max_n=FLAGS.max_n,
+        ngram_vocab=vocab.items(),
+        uniq_count=FLAGS.uniq_count,
+        embed_size=FLAGS.embed_size,
+        rnn_size=FLAGS.rnn_size,
+        rnn_layers=FLAGS.rnn_layers,
+        use_cudnn=FLAGS.use_cudnn,
+        keep_prob=FLAGS.keep_prob,
+        learning_rate=FLAGS.learning_rate,
+        model_dir=FLAGS.model_path,
+    )
+
+    # Run training
+    # hook = MetadataHook(save_steps=1, output_dir=model_dir)
+    train_wildcard = os.path.join(FLAGS.data_path, 'train*.tfrecords.gz')
+    estimator.train(input_fn=lambda: train_input_fn(train_wildcard, batch_size=5))
+
+    # Run evaluation
+    eval_wildcard = os.path.join(FLAGS.data_path, 'valid*.tfrecords.gz')
+    metrics = estimator.evaluate(input_fn=lambda: train_input_fn(eval_wildcard, batch_size=5))
+    print(metrics)
 
 
 if __name__ == "__main__":
@@ -102,12 +102,11 @@ if __name__ == "__main__":
         help='Learning rate')
 
     FLAGS, unparsed = parser.parse_known_args()
-    print(FLAGS)
-    # assert os.path.exists(FLAGS.data_path) and os.path.isdir(FLAGS.data_path)
-    # assert not os.path.exists(FLAGS.model_path) or os.path.isdir(FLAGS.model_path)
-    #
-    # tf.logging.set_verbosity(tf.logging.INFO)
-    # tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)
+    assert os.path.exists(FLAGS.data_path) and os.path.isdir(FLAGS.data_path)
+    assert not os.path.exists(FLAGS.model_path) or os.path.isdir(FLAGS.model_path)
+
+    tf.logging.set_verbosity(tf.logging.INFO)
+    tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)
 
 
 
