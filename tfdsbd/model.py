@@ -66,6 +66,11 @@ def sbd_model_fn(features, labels, mode, params):
                 dtype=None,
                 initializer=tf.random_uniform_initializer(-1, 1),
             )
+            # ngrams_embeddings = tf.nn.dropout(
+            #     ngrams_embeddings,
+            #     keep_prob=params.keep_prob,
+            #     noise_shape=[len(params.ngram_vocab) + params.uniq_count, 1]
+            # )
 
             ngrams_ids = tf.SparseTensor(
                 indices=ngrams_flat.indices,
@@ -79,28 +84,6 @@ def sbd_model_fn(features, labels, mode, params):
                 combiner='mean'
             )
             embeddings = tf.reshape(embeddings, [max_docs, max_tokens, params.embed_size])
-            # vocab_column = tf.feature_column.categorical_column_with_vocabulary_list(
-            #     key='ngrams',
-            #     vocabulary_list=params.ngram_vocab,
-            #     num_oov_buckets=params.uniq_count
-            # )
-            # embedding_column = tf.feature_column.embedding_column(
-            #     categorical_column=vocab_column,
-            #     dimension=params.embed_size
-            # )
-            # embeddings = tf.feature_column.input_layer({
-            #     'ngrams': ngrams
-            # }, [embedding_column])
-            #
-            # # Reshape embeddings to original ngrmas shape
-            # embeddings = tf.reshape(embeddings, [max_docs, max_tokens, max_ngrams, params.embed_size])
-            #
-            # # Mask padded ngrams
-            # embeddings = tf.multiply(embeddings, tf.expand_dims(tf.cast(ngrams_masks, tf.float32), -1))
-            #
-            # # Compute mean for ngrams to get token embeddings
-            # embeddings = tf.reduce_sum(embeddings, axis=-2)
-            # embeddings = tf.divide(embeddings, tf.expand_dims(tf.cast(ngrams_lengths, dtype=tf.float32), -1))
 
         # Add feature extraction layer
         with tf.name_scope('features'):
