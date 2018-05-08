@@ -146,7 +146,8 @@ def sbd_model_fn(features, labels, mode, params):
     # Build EstimatorSpec's
     if mode == tf.estimator.ModeKeys.PREDICT:
         predictions = {
-            'tokens': tokens,
+            # 'tokens': tokens,
+            'tokens': tf.sparse_tensor_to_dense(tokens, default_value=''),
             'classes': tf.argmax(logits, axis=2),
             'probabilities': tf.nn.softmax(logits),
         }
