@@ -81,7 +81,7 @@ def sbd_model_fn(features, labels, mode, params):
                 ngrams_embeddings,
                 ngrams_ids,
                 None,
-                combiner='mean'
+                combiner='sum'
             )
             embeddings = tf.reshape(embeddings, [max_docs, max_tokens, params.embed_size])
 
