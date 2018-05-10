@@ -154,6 +154,9 @@ def sbd_model_fn(features, labels, mode, params):
         return tf.estimator.EstimatorSpec(
             mode=tf.estimator.ModeKeys.PREDICT,
             predictions=predictions,
+            export_outputs={
+                'classify': tf.estimator.export.PredictOutput(predictions)
+            }
         )
 
     # Add the loss

@@ -5,7 +5,7 @@ from __future__ import print_function
 
 from .estimator import SBDEstimator
 from .vocabulary import Vocabulary
-from .input import train_input_fn, predict_input_fn
+from .input import predict_input_fn
 import argparse
 import os
 import sys

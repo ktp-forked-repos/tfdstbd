@@ -5,7 +5,7 @@ from __future__ import print_function
 
 from .estimator import SBDEstimator
 from .vocabulary import Vocabulary
-from .input import train_input_fn, predict_input_fn
+from .input import train_input_fn
 import argparse
 import os
 import sys
@@ -34,7 +34,7 @@ def main(argv):
     )
 
     # Run training
-    # hook = MetadataHook(save_steps=1, output_dir=model_dir)
+    # hook = tf.train.ProfilerHook(save_steps=2, output_dir=FLAGS.model_path, show_memory=True)
     train_wildcard = os.path.join(FLAGS.data_path, 'train*.tfrecords.gz')
     estimator.train(input_fn=lambda: train_input_fn(train_wildcard, batch_size=5))
 
