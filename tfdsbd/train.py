@@ -5,7 +5,7 @@ from __future__ import print_function
 
 from .estimator import SBDEstimator
 from .vocabulary import Vocabulary
-from .input import train_input_fn
+from .input import train_input_fn, serve_input_fn
 import argparse
 import os
 import sys
@@ -42,6 +42,13 @@ def main(argv):
     eval_wildcard = os.path.join(FLAGS.data_path, 'valid*.tfrecords.gz')
     metrics = estimator.evaluate(input_fn=lambda: train_input_fn(eval_wildcard, batch_size=5))
     print(metrics)
+
+    if not FLAGS.no_export:
+        estimator.export_savedmodel(
+            FLAGS.model_path,
+            serve_input_fn,
+            strip_default_attrs=True
+        )
 
 
 if __name__ == "__main__":
@@ -100,6 +107,11 @@ if __name__ == "__main__":
         type=float,
         default=0.001,
         help='Learning rate')
+    parser.add_argument(
+        '-no_export',
+        default=False,
+        action='store_true',
+        help='Do not export trained model')
 
     FLAGS, unparsed = parser.parse_known_args()
     assert os.path.exists(FLAGS.data_path) and os.path.isdir(FLAGS.data_path)

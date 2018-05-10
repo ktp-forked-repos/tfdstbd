@@ -43,3 +43,16 @@ def predict_input_fn(document):
     dataset = dataset.batch(1)
 
     return dataset
+
+
+def serve_input_fn():
+    example_proto = tf.placeholder(dtype=tf.string, shape=[1], name='input_example')
+    receiver_tensors = {'examples': example_proto}
+
+    parsed_features = tf.parse_example(
+        example_proto,
+        features={
+            'document': tf.FixedLenFeature(1, tf.string)
+        })
+
+    return tf.estimator.export.ServingInputReceiver(parsed_features, receiver_tensors)
