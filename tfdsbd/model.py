@@ -158,7 +158,7 @@ def sbd_model_fn(features, labels, mode, params):
             mode=tf.estimator.ModeKeys.PREDICT,
             predictions=predictions,
             export_outputs={
-                'classify': tf.estimator.export.PredictOutput(predictions)
+                'predict': tf.estimator.export.PredictOutput(predictions)
             }
         )
 

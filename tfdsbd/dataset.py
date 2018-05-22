@@ -61,18 +61,10 @@ def make_dataset(tokenized_paragraphs, doc_size, num_repeats):
     paragraphs = list(tokenized_paragraphs)
     paragraphs = paragraphs * num_repeats
     np.random.shuffle(paragraphs)
-    total = len(paragraphs)
-    prev = 0
 
     documents = []
     labels = []
     while len(paragraphs) > 0:
-        done = 100 * (total - len(paragraphs)) / total
-        if int(done) % 100 == 0 and int(done) > prev:
-            prev = int(done)
-            tf.logging.info('Done {}%'.format(int(done)))
-
-
         sample_size = 1 if doc_size == 1 else np.random.randint(1, doc_size)
         sample, paragraphs = paragraphs[:sample_size], paragraphs[sample_size:]
         sample = list(itertools.chain.from_iterable(sample))  # 3-D list of tokens to 2-D (unpack paragraphs)
