@@ -37,11 +37,11 @@ def main(argv):
     # Run training
     # hook = tf.train.ProfilerHook(save_steps=2, output_dir=FLAGS.model_path, show_memory=True)
     train_wildcard = os.path.join(FLAGS.data_path, 'train*.tfrecords.gz')
-    estimator.train(input_fn=lambda: train_input_fn(train_wildcard, batch_size=5))
+    estimator.train(input_fn=lambda: train_input_fn(train_wildcard, FLAGS.batch_size))
 
     # Run evaluation
     eval_wildcard = os.path.join(FLAGS.data_path, 'valid*.tfrecords.gz')
-    metrics = estimator.evaluate(input_fn=lambda: train_input_fn(eval_wildcard, batch_size=5))
+    metrics = estimator.evaluate(input_fn=lambda: train_input_fn(eval_wildcard, FLAGS.batch_size))
     print(metrics)
 
     if len(FLAGS.export_path):
@@ -114,6 +114,11 @@ if __name__ == "__main__":
         type=float,
         default=0.001,
         help='Learning rate')
+    parser.add_argument(
+        '-batch_size',
+        type=int,
+        default=100,
+        help='Examples per batch')
     parser.add_argument(
         '-no_export',
         default=False,
