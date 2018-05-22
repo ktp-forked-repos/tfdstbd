@@ -117,7 +117,7 @@ if __name__ == "__main__":
     parser.add_argument(
         '-batch_size',
         type=int,
-        default=100,
+        default=10,
         help='Examples per batch')
     parser.add_argument(
         '-no_export',
