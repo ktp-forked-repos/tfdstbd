@@ -6,7 +6,7 @@ from io import open
 from collections import Counter
 from operator import itemgetter
 from six.moves import cPickle
-from tfucops import expand_split_words
+from tfunicode import expand_split_words
 from .input import train_input_fn
 from .transform import extract_ngrams
 import argparse

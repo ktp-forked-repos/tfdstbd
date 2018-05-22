@@ -3,7 +3,7 @@ from __future__ import division
 from __future__ import print_function
 
 import tensorflow as tf
-from tfucops import transform_lower_case, transform_upper_case, expand_split_chars, transform_normalize_unicode, \
+from tfunicode import transform_lower_case, transform_upper_case, expand_split_chars, transform_normalize_unicode, \
     transform_zero_digits, transform_wrap_with, expand_char_ngrams
 from . import features_length_case
 

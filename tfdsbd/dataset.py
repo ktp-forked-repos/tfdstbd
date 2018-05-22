@@ -10,7 +10,7 @@ import os
 import sys
 import tensorflow as tf
 from functools import partial
-from tfucops import expand_split_words, transform_normalize_unicode
+from tfunicode import expand_split_words, transform_normalize_unicode
 
 
 def tokenize_dataset(raw_paragraphs):
@@ -61,10 +61,16 @@ def make_dataset(tokenized_paragraphs, doc_size, num_repeats):
     paragraphs = list(tokenized_paragraphs)
     paragraphs = paragraphs * num_repeats
     np.random.shuffle(paragraphs)
+    total = len(paragraphs)
 
     documents = []
     labels = []
     while len(paragraphs) > 0:
+        done = (total - len(paragraphs)) / total
+        if int(done * 100) % 100 == 0:
+            tf.logging.info('Done {}%'.format(int(done * 100)))
+
+
         sample_size = 1 if doc_size == 1 else np.random.randint(1, doc_size)
         sample, paragraphs = paragraphs[:sample_size], paragraphs[sample_size:]
         sample = list(itertools.chain.from_iterable(sample))  # 3-D list of tokens to 2-D (unpack paragraphs)
@@ -178,7 +184,7 @@ if __name__ == "__main__":
     parser.add_argument(
         '-rec_size',
         type=int,
-        default=10000,
+        default=50000,
         help='Maximum documents count per TFRecord file')
     parser.add_argument(
         '-valid_size',
