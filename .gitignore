@@ -106,3 +106,4 @@ sentsegm/data
 .idea/
 data/
 model/
+export/

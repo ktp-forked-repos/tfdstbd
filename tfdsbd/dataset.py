@@ -173,12 +173,12 @@ if __name__ == "__main__":
     parser.add_argument(
         '-doc_size',
         type=int,
-        default=500,
+        default=10,
         help='Maximum paragraphs count per document')
     parser.add_argument(
         '-rec_size',
         type=int,
-        default=1000,
+        default=10000,
         help='Maximum documents count per TFRecord file')
     parser.add_argument(
         '-valid_size',

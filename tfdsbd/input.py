@@ -45,14 +45,28 @@ def predict_input_fn(document):
     return dataset
 
 
+# def serve_input_fn():
+#     example_proto = tf.placeholder(dtype=tf.string, shape=[1], name='input_example')
+#     receiver_tensors = {'examples': example_proto}
+#
+#     parsed_features = tf.parse_example(
+#         example_proto,
+#         features={
+#             'document': tf.FixedLenFeature(1, tf.string)
+#         })
+#
+#     return tf.estimator.export.ServingInputReceiver(parsed_features, receiver_tensors)
+
 def serve_input_fn():
-    example_proto = tf.placeholder(dtype=tf.string, shape=[1], name='input_example')
-    receiver_tensors = {'examples': example_proto}
+    serialized_tf_example = tf.placeholder(dtype=tf.string,
+                                           shape=[None],
+                                           name='examples')
+    features = {
+        'documents': serialized_tf_example
+    }
+    # features = tf.parse_example(serialized_tf_example, {
+    #     'word': tf.FixedLenFeature(1, tf.string)
+    # })
+    # features['word'] = features['word'][0]
 
-    parsed_features = tf.parse_example(
-        example_proto,
-        features={
-            'document': tf.FixedLenFeature(1, tf.string)
-        })
-
-    return tf.estimator.export.ServingInputReceiver(parsed_features, receiver_tensors)
+    return tf.estimator.export.ServingInputReceiver(features, serialized_tf_example)

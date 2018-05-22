@@ -83,7 +83,7 @@ ops.NotDifferentiable("FeaturesLengthCase")
 #     def split(self, document):
 #         assert isinstance(document, string_types)
 #
-#         predictions = self.estimator.predict(input_fn=lambda: predict_input_fn([document]))
+#         predictions = self.estimator._predict(input_fn=lambda: predict_input_fn([document]))
 #         assert 'document' in predictions
 #         assert 'class' in predictions
 #         assert len(predictions['words']) == len(predictions['classes']) == 1

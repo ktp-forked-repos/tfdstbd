@@ -67,7 +67,7 @@ setup(
     include_package_data=True,
     install_requires=[
         'tensorflow>=1.6.0',
-        'tfucops>=1.4.3'
+        'tfunicode>=1.4.4'
     ],
     ext_modules=[
         Extension(

@@ -14,10 +14,11 @@ class SBDEstimator(estimator.Estimator):
                  ngram_vocab,  # list of vocabulary ngrams
                  uniq_count,  # number of uniq ngrams buckets
                  embed_size,  # size of char embedding
+                 embed_dropout,  # embedding dropout probability
                  rnn_size,  # size of single RNN layer
                  rnn_layers,  # number of RNN layers
                  use_cudnn,  # use Cudnn LSTM
-                 keep_prob,  # 1 - dropout probability
+                 rnn_dropout,  # RNN dropout probability
                  learning_rate,  # learning rate
                  model_dir=None,
                  config=None):
@@ -27,10 +28,11 @@ class SBDEstimator(estimator.Estimator):
             ngram_vocab=ngram_vocab,
             uniq_count=uniq_count,
             embed_size=embed_size,
+            embed_dropout=embed_dropout,
             rnn_size=rnn_size,
             rnn_layers=rnn_layers,
             use_cudnn=use_cudnn,
-            keep_prob=keep_prob,
+            rnn_dropout=rnn_dropout,
             learning_rate=learning_rate,
         )
 

@@ -60,17 +60,20 @@ def sbd_model_fn(features, labels, mode, params):
                 params.ngram_vocab,
                 num_oov_buckets=params.uniq_count
             )
+
+            vocab_size = len(params.ngram_vocab) + params.uniq_count
             ngrams_embeddings = tf.get_variable(
                 'ngrams_embeddings',
-                [len(params.ngram_vocab) + params.uniq_count, params.embed_size],
+                [vocab_size, params.embed_size],
                 dtype=None,
                 initializer=tf.random_uniform_initializer(-1, 1),
             )
-            # ngrams_embeddings = tf.nn.dropout(
-            #     ngrams_embeddings,
-            #     keep_prob=params.keep_prob,
-            #     noise_shape=[len(params.ngram_vocab) + params.uniq_count, 1]
-            # )
+            if mode == tf.estimator.ModeKeys.TRAIN and params.embed_dropout > 0:
+                ngrams_embeddings = tf.nn.dropout(
+                    ngrams_embeddings,
+                    keep_prob=1 - params.embed_dropout,
+                    noise_shape=[vocab_size, 1]
+                )
 
             ngrams_ids = tf.SparseTensor(
                 indices=ngrams_flat.indices,
@@ -104,7 +107,7 @@ def sbd_model_fn(features, labels, mode, params):
             lstm = tf.contrib.cudnn_rnn.CudnnLSTM(
                 num_layers=params.rnn_layers,
                 num_units=params.rnn_size,
-                dropout=1 - params.keep_prob if mode == tf.estimator.ModeKeys.TRAIN else 0.0,
+                dropout=params.rnn_dropout if mode == tf.estimator.ModeKeys.TRAIN else 0.0,
                 direction='bidirectional'
             )
             rnn_output, _ = lstm(inputs)
@@ -113,9 +116,9 @@ def sbd_model_fn(features, labels, mode, params):
         else:
             cells_fw = [tf.contrib.rnn.LSTMBlockCell(params.rnn_size) for _ in range(params.rnn_layers)]
             cells_bw = [tf.contrib.rnn.LSTMBlockCell(params.rnn_size) for _ in range(params.rnn_layers)]
-            if mode == tf.estimator.ModeKeys.TRAIN and params.keep_prob < 1:
-                cells_fw = [tf.contrib.rnn.DropoutWrapper(cell, output_keep_prob=params.keep_prob) for cell in cells_fw]
-                cells_bw = [tf.contrib.rnn.DropoutWrapper(cell, output_keep_prob=params.keep_prob) for cell in cells_bw]
+            if mode == tf.estimator.ModeKeys.TRAIN and params.rnn_dropout > 0:
+                cells_fw = [tf.contrib.rnn.DropoutWrapper(cell, output_keep_prob=1 - params.rnn_dropout) for cell in cells_fw]
+                cells_bw = [tf.contrib.rnn.DropoutWrapper(cell, output_keep_prob=1 - params.rnn_dropout) for cell in cells_bw]
             rnn_output, _, _ = tf.contrib.rnn.stack_bidirectional_dynamic_rnn(
                 cells_fw=cells_fw,
                 cells_bw=cells_bw,
@@ -165,7 +168,8 @@ def sbd_model_fn(features, labels, mode, params):
         loss = tf.losses.sparse_softmax_cross_entropy(
             labels=labels,
             logits=logits,
-            weights=tokens_masks
+            weights=tokens_masks,
+            reduction=tf.losses.Reduction.SUM_BY_NONZERO_WEIGHTS
         )
 
     # Add metrics
