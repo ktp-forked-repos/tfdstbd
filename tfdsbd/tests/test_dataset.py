@@ -160,7 +160,6 @@ class TestWriteDataset(tf.test.TestCase):
 
         features, labels = iterator.get_next()
         document = features['documents']
-        labels = tf.sparse_tensor_to_dense(labels, default_value='')
 
         with self.test_session() as sess:
             document_value, labels_value = sess.run([document, labels])

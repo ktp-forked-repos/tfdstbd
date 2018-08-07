@@ -57,6 +57,11 @@ def main(argv):
 
     estimator = tf.contrib.estimator.add_metrics(estimator, additional_metrics)
 
+    # Forward splitted words
+    # https://towardsdatascience.com/how-to-extend-a-canned-tensorflow-estimator-to-add-more-evaluation-metrics-and-to-pass-through-ddf66cd3047d
+    estimator = tf.contrib.estimator.forward_features(estimator, 'words_out')
+
+
     # Run training
     # hook = tf.train.ProfilerHook(save_steps=2, output_dir=FLAGS.model_path, show_memory=True)
     train_wildcard = os.path.join(FLAGS.data_path, 'train*.tfrecords.gz')
@@ -80,9 +85,6 @@ def main(argv):
         ngram_maxn=params.input_ngram_maxn
     ))
     print(metrics)
-
-    # https://towardsdatascience.com/how-to-extend-a-canned-tensorflow-estimator-to-add-more-evaluation-metrics-and-to-pass-through-ddf66cd3047d
-    # estimator = tf.contrib.estimator.forward_features(estimator, KEY_COLUMN)
 
     # if len(FLAGS.export_path):
     #     # feature_inputs = {
@@ -119,7 +121,6 @@ if __name__ == "__main__":
     FLAGS, unparsed = parser.parse_known_args()
     assert os.path.exists(FLAGS.data_path) and os.path.isdir(FLAGS.data_path)
     assert os.path.exists(FLAGS.ngram_vocab) and os.path.isfile(FLAGS.ngram_vocab)
-    assert os.path.exists(FLAGS.hyper_params) and os.path.isfile(FLAGS.hyper_params)
     assert not os.path.exists(FLAGS.model_path) or os.path.isdir(FLAGS.model_path)
     assert not os.path.exists(FLAGS.export_path) or os.path.isdir(FLAGS.export_path)
 

@@ -1,0 +1,19 @@
+{
+  "input_ngram_minn": 3,
+  "input_ngram_maxn": 5,
+  "input_ngram_dimension": 20,
+  "input_ngram_oov": 10000,
+  "input_ngram_combiner": "sum",
+  "input_batch_size": 20,
+  "model_sequence_dropout": 0.0,
+  "model_rnn_type": "regular_bidirectional_lstm",
+  "model_rnn_layers": [
+    64
+  ],
+  "model_rnn_dropout": 0.0,
+  "model_dense_layers": [
+    16
+  ],
+  "model_dense_dropout": 0.0,
+  "train_learning_rate": 0.00001
+}

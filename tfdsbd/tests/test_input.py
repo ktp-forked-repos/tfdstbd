@@ -33,11 +33,11 @@ class TestTrainInputFn(tf.test.TestCase):
             'words',
         ], sorted(features.keys()))
         self.assertEqual(batch_size, len(features['documents']))
-        self.assertEqual(2, len(labels.dense_shape))
-        self.assertEqual(batch_size, labels.dense_shape[0])
+        self.assertEqual(2, len(labels.shape))
+        self.assertEqual(batch_size, labels.shape[0])
 
-        self.assertAllEqual(labels.dense_shape, features['words'].dense_shape)
-        self.assertAllEqual(labels.dense_shape, features['length'].dense_shape)
+        self.assertAllEqual(labels.shape, features['words'].dense_shape)
+        self.assertAllEqual(labels.shape, features['length'].dense_shape)
 
 
 if __name__ == "__main__":

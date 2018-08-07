@@ -29,10 +29,11 @@ def extract_case_length_features(input_words):
         chars_count.values
     )
     word_length_values = tf.divide(word_length_values, _MAX_LENGTH)
+    word_length_values.set_shape(input_words.values.shape)
     word_length = tf.SparseTensor(
-        indices=chars_count.indices,
+        indices=input_words.indices,
         values=word_length_values,
-        dense_shape=chars_count.dense_shape,
+        dense_shape=input_words.dense_shape,
     )
 
     no_case_value = tf.logical_and(
