@@ -5,7 +5,7 @@ from __future__ import print_function
 
 import os
 import tensorflow as tf
-from ..input import train_input_fn, predict_input_fn
+from ..input import train_input_fn
 
 
 class TestTrainInputFn(tf.test.TestCase):
@@ -13,41 +13,31 @@ class TestTrainInputFn(tf.test.TestCase):
         wildcard = os.path.join(os.path.dirname(__file__), 'data', 'train*.tfrecords.gz')
         batch_size = 2
 
-        dataset = train_input_fn(wildcard, batch_size)
+        dataset = train_input_fn(wildcard, batch_size, 1, 1)
         iterator = dataset.make_one_shot_iterator()
         features = iterator.get_next()
 
         with self.test_session() as sess:
             features, labels = sess.run(features)
-            self.assertEqual(type(features), dict)
-            self.assertEqual(sorted(features.keys()), ['documents'])
-            self.assertEqual(len(features['documents']), batch_size)
-            self.assertEqual([len(_) for _ in labels], [193, 193])
 
+        self.assertEqual(dict, type(features))
+        self.assertEqual([
+            'documents',
+            'length',
+            'lower_case',
+            'mixed_case',
+            'ngrams',
+            'no_case',
+            'title_case',
+            'upper_case',
+            'words',
+        ], sorted(features.keys()))
+        self.assertEqual(batch_size, len(features['documents']))
+        self.assertEqual(2, len(labels.dense_shape))
+        self.assertEqual(batch_size, labels.dense_shape[0])
 
-class TestPredictInputFn(tf.test.TestCase):
-    def testNormal(self):
-        expected = [
-            u'Интернет', u'-', u'ресурсы', u' ', u'netBridge', u' ', u'изначально', u' ', u'строились', u' ', u'как',
-            u' ', u'копии', u' ', u'самых', u' ', u'известных', u' ', u'и', u' ', u'популярных', u' ', u'американских',
-            u' ', u'сайтов', u' ', u'и', u',', u' ', u'очевидно', u',', u' ', u'предназначались', u' ', u'на', u' ',
-            u'продажу', u' ', u'инвестору', u'.',
-            u' ',
-            u'С', u'.', u' ', u'Старостин', u':', u' ', u'-', u'-', u' ', u'15', u' ', u'тысяч', u' ', u'лет', u' ',
-            u'-', u'-', u' ', u'это', u' ', u'время', u' ', u'существования', u' ', u'ностратической', u' ', u'семьи',
-            u',', u' ', u'древней', u' ', u'языковой', u' ', u'общности', u',', u' ', u'которая', u' ', u'позднее',
-            u' ', u'породила', u' ', u'индоевропейские', u',', u' ', u'алтайские', u',', u' ', u'уральские', u' ', u'и',
-            u' ', u'некоторые', u' ', u'другие', u' ', u'языки', u'.']
-
-        dataset = predict_input_fn([u''.join(expected)])
-        iterator = dataset.make_one_shot_iterator()
-        features = iterator.get_next()
-
-        with self.test_session() as sess:
-            result = sess.run(features)
-            self.assertEqual(type(result), dict)
-            self.assertEqual(sorted(result.keys()), ['documents'])
-            self.assertEqual(len(result['documents']), 1)
+        self.assertAllEqual(labels.dense_shape, features['words'].dense_shape)
+        self.assertAllEqual(labels.dense_shape, features['length'].dense_shape)
 
 
 if __name__ == "__main__":

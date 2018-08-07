@@ -10,62 +10,73 @@ import os
 import sys
 import tensorflow as tf
 from functools import partial
-from tfunicode import expand_split_words, transform_normalize_unicode
+from tfunicode import expand_split_words
 
 
-def tokenize_dataset(raw_paragraphs):
+def tokenize_dataset(raw_content, batch_size=100):
     filter_by_len = partial(filter, len)
     iterator_to_list = partial(map, list)
 
-    paragraphs = raw_paragraphs.split(b'\n\n')  # 0D -> 1D (text -> paragraphs)
-    paragraphs = map(lambda p: p.split(b'\n'), paragraphs)  # 1D -> 2D (paragraphs -> sentences)
-    paragraphs = map(partial(map, lambda s: s.strip(b'\r\n')), paragraphs)  # strip sentences
-    paragraphs = map(filter_by_len, paragraphs)  # filter out 0-len sentences
-    paragraphs = iterator_to_list(paragraphs)  # sentence iterator -> sentence list
-    paragraphs = filter_by_len(paragraphs)  # filter out 0-len paragraphs
-    paragraphs = list(paragraphs)  # paragraph iterator -> paragraph list
+    def split_by_newline(paragraph):
+        return [list(group) for k, group in itertools.groupby(paragraph, lambda t: b'\n' in t) if not k]
 
-    tf.reset_default_graph()
+    paragraphs_input = tf.placeholder(tf.string, shape=[None])
+    transform_pipeline = expand_split_words(paragraphs_input)
+    transform_pipeline = tf.sparse_tensor_to_dense(transform_pipeline, default_value='')
 
-    input = tf.placeholder(tf.string, shape=(None))
-    pipeline = transform_normalize_unicode(input, 'NFC')
-    pipeline = expand_split_words(pipeline)
-    pipeline = tf.sparse_tensor_to_dense(pipeline, default_value='')
+    pipeline_result = []
     with tf.Session() as sess:
-        result = [sess.run(pipeline, feed_dict={input: sentences}) for sentences in paragraphs]
+        raw_paragraphs = raw_content.strip().split(b'\n\n')
+        raw_paragraphs = [rp.strip() for rp in raw_paragraphs]
+        raw_paragraphs = sorted(raw_paragraphs, key=len)  # for lower memory consumption
 
-    result = map(partial(map, filter_by_len), result)  # filter out 0-len tokens
-    result = map(iterator_to_list, result)  # tokens iterator -> tokens list
-    result = map(filter_by_len, result)  # filter out 0-len sentences
-    result = iterator_to_list(result)  # sentence iterator -> sentence list
-    result = list(result)  # paragraph iterator -> paragraph list
+        while len(raw_paragraphs):
+            pipeline_todo, raw_paragraphs = raw_paragraphs[:batch_size], raw_paragraphs[batch_size:]
+            pipeline_done = sess.run(transform_pipeline, feed_dict={paragraphs_input: pipeline_todo})
+            pipeline_done = map(filter_by_len, pipeline_done)
+            pipeline_result.extend(pipeline_done)
 
-    return result
+    result_paragraphs = map(split_by_newline, pipeline_result)
+    result_paragraphs = filter_by_len(result_paragraphs)
+    result_paragraphs = iterator_to_list(result_paragraphs)
+    result_paragraphs = list(result_paragraphs)
+
+    np.random.shuffle(result_paragraphs)
+
+    return result_paragraphs
 
 
 def make_dataset(tokenized_paragraphs, doc_size, num_repeats):
     def glue(max_spaces, max_tabs, max_newlines):
-        glue = [b' '] * np.random.randint(1, max_spaces) + \
-               [b'\t'] * np.random.randint(0, max_tabs) + \
-               [b'\n'] * np.random.randint(0, max_newlines)
+        result = [b' '] * np.random.randint(1, max_spaces + 1) + \
+                 [b'\t'] * np.random.randint(0, max_tabs + 1) + \
+                 [b'\n'] * np.random.randint(0, int(max_newlines * 0.9 + 1)) + \
+                 [b'\r\n'] * np.random.randint(0, int(max_newlines * 0.1 + 1))
+        np.random.shuffle(result)
+        size = 1 + int(np.random.exponential(0.5))
 
-        np.random.shuffle(glue)
-        size = 1 + int(np.random.exponential(2.))
+        result = result[:size]
+        for i, g in enumerate(result):
+            if 0 == i:
+                continue
+            if b' ' in result[i - 1] and b' ' in result[i]:
+                result[i] = result[i - 1] + result[i]
+                result[i - 1] = b''
+        result = [r for r in result if len(r)]
 
-        return glue[:size]
+        return result
 
     not_boundary_glue = partial(glue, 298, 1, 1)
     default_boundary_glue = partial(glue, 280, 10, 10)
     extra_boundary_glue = partial(glue, 200, 25, 125)
 
-    paragraphs = list(tokenized_paragraphs)
-    paragraphs = paragraphs * num_repeats
+    paragraphs = list(tokenized_paragraphs) * num_repeats
     np.random.shuffle(paragraphs)
 
     documents = []
     labels = []
     while len(paragraphs) > 0:
-        sample_size = 1 if doc_size == 1 else np.random.randint(1, doc_size)
+        sample_size = np.random.randint(1, doc_size)
         sample, paragraphs = paragraphs[:sample_size], paragraphs[sample_size:]
         sample = list(itertools.chain.from_iterable(sample))  # 3-D list of tokens to 2-D (unpack paragraphs)
 
@@ -75,22 +86,21 @@ def make_dataset(tokenized_paragraphs, doc_size, num_repeats):
             if len(sentence) > 1 and sentence[-2] == ' ' and sentence[-1] in ['.', '!', '?']:
                 sentence = sentence[:-2] + sentence[-1:]
             sentence = [not_boundary_glue() if token.isspace() else [token] for token in sentence]
-            sentence = [token for token in sentence if len(token)]  # filter out empty tokens
             sentence = list(itertools.chain.from_iterable(sentence))
 
             last_letter = sentence[-1].decode('utf-8')[-1]
             X_glue = extra_boundary_glue() if last_letter.isalnum() else default_boundary_glue()
-            y_glue = [1] * len(X_glue)
+            y_glue = [b'B'] * len(X_glue)
 
             X.extend(sentence + X_glue)
-            y.extend([0] * len(sentence) + y_glue)
-        assert len(X) == len(y), 'items count should be equal labels count'
+            y.extend([b'N'] * len(sentence) + y_glue)
 
+        assert len(X) == len(y), 'tokens count should be equal labels count'
         documents.append(b''.join(X))
         labels.append(y)
 
     dataset = list(zip(documents, labels))
-    dataset.sort(key=lambda d: len(d[1]), reverse=True)  # sort from max to min len
+    dataset.sort(key=lambda d: len(d[1]), reverse=True)  # sort from max to min length
 
     return dataset
 
@@ -99,7 +109,7 @@ def write_dataset(dest_path, set_title, base_name, rec_size, set_data):
     def create_example(document, labels):
         return tf.train.Example(features=tf.train.Features(feature={
             'document': tf.train.Feature(bytes_list=tf.train.BytesList(value=[tf.compat.as_bytes(document)])),
-            'labels': tf.train.Feature(int64_list=tf.train.Int64List(value=labels)),
+            'labels': tf.train.Feature(bytes_list=tf.train.BytesList(value=[tf.compat.as_bytes(l) for l in labels])),
         })).SerializeToString()
 
     if not len(set_data):
@@ -131,6 +141,7 @@ def main(argv):
 
     tf.logging.info('Tokenizing source dataset')
     tokenized_samples = tokenize_dataset(source_content)
+    np.random.shuffle(tokenized_samples)
     del source_content
 
     tf.logging.info('Splitting tokenized dataset')
@@ -143,20 +154,20 @@ def main(argv):
     test_smaples = tokenized_samples[train_count + valid_count:]
     del tokenized_samples
 
-    tf.logging.info('Processing training dataset ({} paragraphs)'.format(train_count))
-    train_dataset = make_dataset(train_smaples, FLAGS.doc_size, FLAGS.num_repeats)
-    write_dataset(FLAGS.dest_path, 'train', base_name, FLAGS.rec_size, train_dataset)
-    del train_dataset
+    tf.logging.info('Processing test dataset ({} paragraphs)'.format(test_count))
+    test_dataset = make_dataset(test_smaples, FLAGS.doc_size, 1)
+    write_dataset(FLAGS.dest_path, 'test', base_name, FLAGS.rec_size, test_dataset)
+    del test_dataset
 
     tf.logging.info('Processing validation dataset ({} paragraphs)'.format(valid_count))
     valid_dataset = make_dataset(valid_smaples, FLAGS.doc_size, 1)
     write_dataset(FLAGS.dest_path, 'valid', base_name, FLAGS.rec_size, valid_dataset)
     del valid_dataset
 
-    tf.logging.info('Processing test dataset ({} paragraphs)'.format(test_count))
-    test_dataset = make_dataset(test_smaples, FLAGS.doc_size, 1)
-    write_dataset(FLAGS.dest_path, 'test', base_name, FLAGS.rec_size, test_dataset)
-    del test_dataset
+    tf.logging.info('Processing training dataset ({} paragraphs)'.format(train_count))
+    train_dataset = make_dataset(train_smaples, FLAGS.doc_size, FLAGS.num_repeats)
+    write_dataset(FLAGS.dest_path, 'train', base_name, FLAGS.rec_size, train_dataset)
+    del train_dataset
 
 
 if __name__ == "__main__":
@@ -165,11 +176,11 @@ if __name__ == "__main__":
     parser.add_argument(
         'src_file',
         type=argparse.FileType('rb'),
-        help=u'Text file with source dataset. Paragraphs should be divided by double \\n, sentences by single one')
+        help='Text file with source dataset. Paragraphs should be divided with double \\n, sentences with single one')
     parser.add_argument(
         'dest_path',
         type=str,
-        help='Directory where to store TFRecord files')
+        help='Directory to store TFRecord files')
     parser.add_argument(
         '-doc_size',
         type=int,
@@ -194,7 +205,7 @@ if __name__ == "__main__":
         '-num_repeats',
         type=int,
         default=10,
-        help='How many times repeat each dataset. Useful due to random sentences glue')
+        help='How many times repeat each dataset. Useful due sentences shuffling and random glue')
 
     FLAGS, unparsed = parser.parse_known_args()
     assert not os.path.exists(FLAGS.dest_path) or os.path.isdir(FLAGS.dest_path)

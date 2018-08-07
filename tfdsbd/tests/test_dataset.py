@@ -15,15 +15,18 @@ from ..input import train_input_fn
 
 
 class TestTokenizeDataset(unittest.TestCase):
+    def setUp(self):
+        np.random.seed(2)
+
     def testNormal(self):
         source = b'Single sentence.\n\nFirst sentence in paragraph.\r\nSecond sentence in paragraph.'
         expected = [
             [
-                [b'Single', b' ', b'sentence', b'.'],
-            ],
-            [
                 [b'First', b' ', b'sentence', b' ', b'in', b' ', b'paragraph', b'.'],
                 [b'Second', b' ', b'sentence', b' ', b'in', b' ', b'paragraph', b'.'],
+            ],
+            [
+                [b'Single', b' ', b'sentence', b'.'],
             ],
         ]
         result = tokenize_dataset(source)
@@ -34,7 +37,7 @@ class TestTokenizeDataset(unittest.TestCase):
         expected = [
             [
                 [b'Single', b' ', b'sentence', b'.'],
-                [b' ', b' '],
+                [b'  '],
                 [b'\t'],
                 [b'Next', b' ', b'single', b' ', b'sentence', b'.']
             ]
@@ -66,38 +69,37 @@ class TestMakeDataset(unittest.TestCase):
         ]
 
         expected_documents = [
-            b'First sentence       without    dot  \n\t' +
-            b'Second   "sentence!" ' +
-            b'Third sentence.\t  \t ',
-
-            b'First  sentence without dot\n\n\t\n\n\n\n\n' +
+            b'First sentence\twithout dot\n\n' +
             b'Second "sentence!" ' +
-            b'Third     sentence.  ',
+            b'Third sentence. ',
 
-            u'Первое предложение  в параграфе\t\t'.encode('utf-8') +
-            b'Second   sentence in         paragraph. ',
+            b'First sentence without  dot ' +
+            b'Second  "sentence!" ' +
+            b'Third sentence. ',
 
-            u'Первое  предложение  в параграфе  '.encode('utf-8') +
-            b'Second      sentence  in paragraph. ',
+            u'Первое предложение в параграфе\n '.encode('utf-8') +
+            b'Second sentence  in paragraph. ',
+
+            u'Первое предложение в параграфе\n\n'.encode('utf-8') +
+            b'Second sentence in paragraph.   ',
         ]
         expected_labels = [
             [
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1,
-                0, 0, 0, 0, 0, 0, 0, 0, 1,
-                0, 0, 0, 0, 1, 1, 1, 1, 1
+                b'N', b'N', b'N', b'N', b'N', b'N', b'N', b'B', b'B',
+                b'N', b'N', b'N', b'N', b'N', b'N', b'B', b'N', b'N', b'N', b'N', b'B'
             ],
             [
-                0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1,
-                0, 0, 0, 0, 0, 0, 1,
-                0, 0, 0, 0, 0, 0, 0, 0, 1, 1
+                b'N', b'N', b'N', b'N', b'N', b'N', b'N', b'B',
+                b'N', b'N', b'N', b'N', b'N', b'N', b'B',
+                b'N', b'N', b'N', b'N', b'B'
             ],
             [
-                0, 0, 0, 0, 0, 0, 0, 0, 1, 1,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+                b'N', b'N', b'N', b'N', b'N', b'N', b'N', b'B', b'B',
+                b'N', b'N', b'N', b'N', b'N', b'N', b'N', b'N', b'B'
             ],
             [
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
+                b'N', b'N', b'N', b'N', b'N', b'N', b'N', b'B', b'B',
+                b'N', b'N', b'N', b'N', b'N', b'N', b'N', b'N', b'B'
             ],
         ]
 
@@ -126,11 +128,11 @@ class TestWriteDataset(tf.test.TestCase):
                 u'Second sentence in  paragraph.'.encode('utf-8'),
 
                 [
-                    0, 0, 0, 0, 0, 0, 0, 0, 1,
-                    0, 0, 0, 0, 0, 0, 1,
-                    0, 0, 0, 0, 1,
-                    0, 0, 0, 0, 0, 0, 0, 0, 1,
-                    0, 0, 0, 0, 0, 0, 0, 0, 0
+                    b'N', b'N', b'N', b'N', b'N', b'N', b'N', b'N', b'B',
+                    b'N', b'N', b'N', b'N', b'N', b'N', b'B',
+                    b'N', b'N', b'N', b'N', b'B',
+                    b'N', b'N', b'N', b'N', b'N', b'N', b'N', b'N', b'B',
+                    b'N', b'N', b'N', b'N', b'N', b'N', b'N', b'N', b'N'
                 ]
             ),
             (
@@ -141,11 +143,11 @@ class TestWriteDataset(tf.test.TestCase):
                 u'Second sentence in paragraph.'.encode('utf-8'),
 
                 [
-                    0, 0, 0, 0, 0, 0, 0, 0, 1,
-                    0, 0, 0, 0, 0, 0, 1,
-                    0, 0, 0, 0, 0, 1,
-                    0, 0, 0, 0, 0, 0, 0, 0, 1,
-                    0, 0, 0, 0, 0, 0, 0, 0
+                    b'N', b'N', b'N', b'N', b'N', b'N', b'N', b'N', b'B',
+                    b'N', b'N', b'N', b'N', b'N', b'N', b'B',
+                    b'N', b'N', b'N', b'N', b'N', b'B',
+                    b'N', b'N', b'N', b'N', b'N', b'N', b'N', b'N', b'B',
+                    b'N', b'N', b'N', b'N', b'N', b'N', b'N', b'N'
                 ]
             )
         ]
@@ -153,17 +155,18 @@ class TestWriteDataset(tf.test.TestCase):
         write_dataset(self.temp_dir, 'test', 'buffer', 100, source)
 
         wildcard = os.path.join(self.temp_dir, '*.tfrecords.gz')
-        dataset = train_input_fn(wildcard, 1)
+        dataset = train_input_fn(wildcard, 1, 1, 1)
         iterator = dataset.make_one_shot_iterator()
-        next_element = iterator.get_next()
+
+        features, labels = iterator.get_next()
+        document = features['documents']
+        labels = tf.sparse_tensor_to_dense(labels, default_value='')
 
         with self.test_session() as sess:
-            features, labels = sess.run(next_element)
-            self.assertEqual(source[0][0], features['documents'][0])
-            self.assertEqual(source[0][1], labels[0].tolist())
+            document_value, labels_value = sess.run([document, labels])
+            self.assertEqual(source[0][0], document_value[0])
+            self.assertEqual(source[0][1], labels_value[0].tolist())
 
-            features, labels = sess.run(next_element)
-            self.assertEqual(source[1][0], features['documents'][0])
-            self.assertEqual(source[1][1], labels[0].tolist())
-
-
+            document_value, labels_value = sess.run([document, labels])
+            self.assertEqual(source[1][0], document_value[0])
+            self.assertEqual(source[1][1], labels_value[0].tolist())
