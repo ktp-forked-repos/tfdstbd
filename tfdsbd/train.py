@@ -52,8 +52,7 @@ def main(argv):
 
     # Add F1 metric
     def additional_metrics(labels, predictions):
-        print(predictions)
-        return {'f1': f1_score(labels, predictions[prediction_keys.PredictionKeys.CLASSES])}
+        return {'f1': f1_score(labels, predictions[prediction_keys.PredictionKeys.CLASS_IDS])}
 
     estimator = tf.contrib.estimator.add_metrics(estimator, additional_metrics)
 

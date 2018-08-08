@@ -9,7 +9,7 @@ with open('README.md', 'r') as fh:
 
 setup(
     name='tfdsbd',
-    version='0.2',
+    version='1.0.0',
     description='Deep sentence boundary detection implemented with Tensorflow',
     long_description=long_description,
     long_description_content_type="text/markdown",
