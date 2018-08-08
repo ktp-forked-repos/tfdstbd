@@ -55,7 +55,7 @@ def train_input_fn(wild_card, batch_size, ngram_minn, ngram_maxn):
             length, no_case, lower_case, upper_case, title_case, mixed_case = extract_case_length_features(words)
             ngrams = extract_ngram_features(words, ngram_minn, ngram_maxn)
 
-            labels = tf.sparse_tensor_to_dense(examples['labels'], default_value='N')
+            labels = tf.sparse_tensor_to_dense(examples['labels'], default_value='B')
 
             return {
                        'documents': documents,
