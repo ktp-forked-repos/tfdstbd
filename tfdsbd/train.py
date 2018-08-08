@@ -59,7 +59,7 @@ def main(argv):
 
     # Forward splitted words
     # https://towardsdatascience.com/how-to-extend-a-canned-tensorflow-estimator-to-add-more-evaluation-metrics-and-to-pass-through-ddf66cd3047d
-    estimator = tf.contrib.estimator.forward_features(estimator, 'words_out')
+    estimator = tf.contrib.estimator.forward_features(estimator, 'words')
 
 
     # Run training
