@@ -25,12 +25,12 @@ def input_feature_columns(ngram_vocab, ngram_dimension, ngram_oov=1, ngram_combi
 
     return [
         ngram_embedding_column,
-        contrib_columns.sequence_numeric_column('length'),
-        contrib_columns.sequence_numeric_column('no_case'),
-        contrib_columns.sequence_numeric_column('lower_case'),
-        contrib_columns.sequence_numeric_column('upper_case'),
-        contrib_columns.sequence_numeric_column('title_case'),
-        contrib_columns.sequence_numeric_column('mixed_case'),
+        contrib_columns.sequence_numeric_column('word_length'),
+        contrib_columns.sequence_numeric_column('is_no_case'),
+        contrib_columns.sequence_numeric_column('is_lower_case'),
+        contrib_columns.sequence_numeric_column('is_upper_case'),
+        contrib_columns.sequence_numeric_column('is_title_case'),
+        contrib_columns.sequence_numeric_column('is_mixed_case'),
     ]
 
 
