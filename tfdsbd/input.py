@@ -51,7 +51,7 @@ def train_input_fn(wild_card, batch_size, ngram_minn, ngram_maxn):
                 })
 
             documents = tf.squeeze(examples['document'], axis=1)
-            words = expand_split_words(documents)
+            words = expand_split_words(documents)  # Transformation should be equal with train dataset tokenization
             length, no_case, lower_case, upper_case, title_case, mixed_case = extract_case_length_features(words)
             ngrams = extract_ngram_features(words, ngram_minn, ngram_maxn)
 
@@ -59,15 +59,14 @@ def train_input_fn(wild_card, batch_size, ngram_minn, ngram_maxn):
 
             return {
                        'documents': documents,
-                       'words': words,
-                       'words_out': tf.sparse_tensor_to_dense(words, default_value=''),
+                       'words': tf.sparse_tensor_to_dense(words, default_value=''),
                        'ngrams': ngrams,
-                       'length': length,
-                       'no_case': no_case,
-                       'lower_case': lower_case,
-                       'upper_case': upper_case,
-                       'title_case': title_case,
-                       'mixed_case': mixed_case,
+                       'word_length': length,
+                       'is_no_case': no_case,
+                       'is_lower_case': lower_case,
+                       'is_upper_case': upper_case,
+                       'is_title_case': title_case,
+                       'is_mixed_case': mixed_case,
                    }, labels
 
         dataset = dataset.map(_parse_examples, num_parallel_calls=32)

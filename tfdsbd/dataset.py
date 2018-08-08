@@ -13,91 +13,135 @@ from functools import partial
 from tfunicode import expand_split_words
 
 
-def tokenize_dataset(raw_content, batch_size=100):
-    filter_by_len = partial(filter, len)
-    iterator_to_list = partial(map, list)
+def parse_dataset(raw_content):
+    result_paragraphs = []
+    for raw_paragraph in raw_content.strip().split('\n\n'):
+        raw_paragraph = raw_paragraph.strip()
+        if not len(raw_paragraph):
+            continue
 
-    def split_by_newline(paragraph):
-        return [list(group) for k, group in itertools.groupby(paragraph, lambda t: b'\n' in t) if not k]
+        result_sentences = []
+        for raw_sentence in raw_paragraph.strip().split('\n'):
+            raw_sentence = raw_sentence.strip()
+            if not len(raw_sentence):
+                continue
 
-    paragraphs_input = tf.placeholder(tf.string, shape=[None])
+            result_sentences.append(raw_sentence)
+        result_paragraphs.append(result_sentences)
+    np.random.shuffle(result_paragraphs)
+
+    return result_paragraphs
+
+
+def _make_glue_values(max_spaces, max_tabs, max_newlines, reserve):
+    glue_values = [' '] * np.random.randint(1, (max_spaces + 1) * reserve) + \
+                  ['\t'] * np.random.randint(0, (max_tabs + 1) * reserve) + \
+                  ['\n'] * np.random.randint(0, int(max_newlines * 0.9 + 1) * reserve) + \
+                  ['\r\n'] * np.random.randint(0, int(max_newlines * 0.1 + 1) * reserve)
+    np.random.shuffle(glue_values)
+
+    glue_sizes = np.random.exponential(0.5, len(glue_values))
+
+    result = []
+    si, vi = 0, 0
+    while len(glue_values) > vi and len(glue_sizes) > si:
+        size = 1 + int(glue_sizes[si])
+        value = glue_values[vi:vi + size]
+        si, vi = si + 1, vi + size
+        result.append(''.join(value))
+
+    return result
+
+
+def augment_dataset(source_paragraphs, reserve=10000):
+    inner_glue = _make_glue_values(298, 1, 1, reserve * 10)
+    default_glue = _make_glue_values(280, 10, 10, reserve)
+    extra_glue = _make_glue_values(200, 25, 125, reserve)
+
+    result_paragraphs = []
+    for p, raw_paragraph in enumerate(source_paragraphs):
+        result_sentences = []
+        for raw_sentence in raw_paragraph:
+            sentence_glue = extra_glue.pop() if raw_sentence[-1].isalnum() else default_glue.pop()
+            if not len(default_glue):
+                default_glue = _make_glue_values(280, 10, 10, reserve)
+            if not len(extra_glue):
+                extra_glue = _make_glue_values(200, 25, 125, reserve)
+
+            spaces = [i for i in range(len(raw_sentence)) if raw_sentence[i].isspace()]
+            for space in reversed(spaces):
+                words_glue = inner_glue.pop()
+                if not len(inner_glue):
+                    inner_glue = _make_glue_values(298, 1, 1, reserve * 10)
+                if ' ' == inner_glue:
+                    continue
+                raw_sentence = raw_sentence[:space] + words_glue + raw_sentence[space + 1:]
+            result_sentences.append(raw_sentence + sentence_glue)
+        result_paragraphs.append(result_sentences)
+
+    return result_paragraphs
+
+
+def _aling_paragraphs_length(source_paragraphs):
+    max_len = max([len(p) for p in source_paragraphs])
+
+    return [p + [''] * (max_len - len(p)) for p in source_paragraphs]
+
+
+def tokenize_dataset(source_paragraphs, batch_size=1000):
+    # Sort by approximate number of tokens for lower memory consumption
+    source_paragraphs = sorted(source_paragraphs, key=lambda p: sum([s.count(' ') for s in p]))
+
+    paragraphs_input = tf.placeholder(tf.string, shape=[None, None])
     transform_pipeline = expand_split_words(paragraphs_input)
     transform_pipeline = tf.sparse_tensor_to_dense(transform_pipeline, default_value='')
 
-    pipeline_result = []
+    result_paragraphs = []
     with tf.Session() as sess:
-        raw_paragraphs = raw_content.strip().split(b'\n\n')
-        raw_paragraphs = [rp.strip() for rp in raw_paragraphs]
-        raw_paragraphs = sorted(raw_paragraphs, key=len)  # for lower memory consumption
+        while len(source_paragraphs):
+            pipeline_todo, source_paragraphs = source_paragraphs[:batch_size], source_paragraphs[batch_size:]
+            pipeline_todo = _aling_paragraphs_length(pipeline_todo)
 
-        while len(raw_paragraphs):
-            pipeline_todo, raw_paragraphs = raw_paragraphs[:batch_size], raw_paragraphs[batch_size:]
             pipeline_done = sess.run(transform_pipeline, feed_dict={paragraphs_input: pipeline_todo})
-            pipeline_done = map(filter_by_len, pipeline_done)
-            pipeline_result.extend(pipeline_done)
 
-    result_paragraphs = map(split_by_newline, pipeline_result)
-    result_paragraphs = filter_by_len(result_paragraphs)
-    result_paragraphs = iterator_to_list(result_paragraphs)
-    result_paragraphs = list(result_paragraphs)
+            for dp in pipeline_done:
+                done_sentences = []
+                for ds in dp:
+                    ds = [w.decode('utf-8') for w in ds if len(w)]
+                    if len(ds):
+                        done_sentences.append(ds)
+                if len(done_sentences):
+                    result_paragraphs.append(done_sentences)
 
     np.random.shuffle(result_paragraphs)
 
     return result_paragraphs
 
 
-def make_dataset(tokenized_paragraphs, doc_size, num_repeats):
-    def glue(max_spaces, max_tabs, max_newlines):
-        result = [b' '] * np.random.randint(1, max_spaces + 1) + \
-                 [b'\t'] * np.random.randint(0, max_tabs + 1) + \
-                 [b'\n'] * np.random.randint(0, int(max_newlines * 0.9 + 1)) + \
-                 [b'\r\n'] * np.random.randint(0, int(max_newlines * 0.1 + 1))
-        np.random.shuffle(result)
-        size = 1 + int(np.random.exponential(0.5))
-
-        result = result[:size]
-        for i, g in enumerate(result):
-            if 0 == i:
-                continue
-            if b' ' in result[i - 1] and b' ' in result[i]:
-                result[i] = result[i - 1] + result[i]
-                result[i - 1] = b''
-        result = [r for r in result if len(r)]
-
-        return result
-
-    not_boundary_glue = partial(glue, 298, 1, 1)
-    default_boundary_glue = partial(glue, 280, 10, 10)
-    extra_boundary_glue = partial(glue, 200, 25, 125)
-
-    paragraphs = list(tokenized_paragraphs) * num_repeats
-    np.random.shuffle(paragraphs)
-
+def make_dataset(source_paragraphs, doc_size):
     documents = []
     labels = []
-    while len(paragraphs) > 0:
-        sample_size = np.random.randint(1, doc_size)
-        sample, paragraphs = paragraphs[:sample_size], paragraphs[sample_size:]
-        sample = list(itertools.chain.from_iterable(sample))  # 3-D list of tokens to 2-D (unpack paragraphs)
 
-        X = []
-        y = []
-        for sentence in sample:
-            if len(sentence) > 1 and sentence[-2] == ' ' and sentence[-1] in ['.', '!', '?']:
-                sentence = sentence[:-2] + sentence[-1:]
-            sentence = [not_boundary_glue() if token.isspace() else [token] for token in sentence]
-            sentence = list(itertools.chain.from_iterable(sentence))
+    while len(source_paragraphs) > 0:
+        sample_words = []
+        sample_labels = []
 
-            last_letter = sentence[-1].decode('utf-8')[-1]
-            X_glue = extra_boundary_glue() if last_letter.isalnum() else default_boundary_glue()
-            y_glue = [b'B'] * len(X_glue)
+        while len(sample_words) < doc_size and len(source_paragraphs) > 0:
+            current_paragraph = source_paragraphs.pop()
 
-            X.extend(sentence + X_glue)
-            y.extend([b'N'] * len(sentence) + y_glue)
+            for sentence in current_paragraph:
+                if len(sentence) > 1 and sentence[-2] == ' ' and sentence[-1] in ['.', '!', '?']:
+                    sentence = sentence[:-2] + sentence[-1:]
+                last_meaning = max([i for i, w in enumerate(sentence) if len(w.strip())])
 
-        assert len(X) == len(y), 'tokens count should be equal labels count'
-        documents.append(b''.join(X))
-        labels.append(y)
+                sample_words.extend(sentence)
+                sample_labels.extend(['N'] * (last_meaning + 1))
+                sample_labels.extend(['B'] * (len(sentence) - last_meaning - 1))
+
+                assert len(sample_words) == len(sample_labels), 'tokens count should be equal labels count'
+
+        documents.append(''.join(sample_words))
+        labels.append(sample_labels)
 
     dataset = list(zip(documents, labels))
     dataset.sort(key=lambda d: len(d[1]), reverse=True)  # sort from max to min length
@@ -136,38 +180,40 @@ def main(argv):
     del argv
 
     tf.logging.info('Loading source dataset from {}'.format(FLAGS.src_file.name))
-    source_content = FLAGS.src_file.read()
+    source_content = FLAGS.src_file.read().decode('utf-8')
     base_name, _ = os.path.splitext(os.path.basename(FLAGS.src_file.name))
+    paragraphs_data = parse_dataset(source_content)
 
-    tf.logging.info('Tokenizing source dataset')
-    tokenized_samples = tokenize_dataset(source_content)
-    np.random.shuffle(tokenized_samples)
-    del source_content
-
-    tf.logging.info('Splitting tokenized dataset')
-    samples_count = len(tokenized_samples)
+    tf.logging.info('Splitting train/test/valid datasets')
+    samples_count = len(paragraphs_data)
     valid_count = int(math.floor(samples_count * FLAGS.valid_size))
     test_count = int(math.floor(samples_count * FLAGS.test_size))
     train_count = samples_count - test_count - valid_count
-    train_smaples = tokenized_samples[:train_count]
-    valid_smaples = tokenized_samples[train_count: train_count + valid_count]
-    test_smaples = tokenized_samples[train_count + valid_count:]
-    del tokenized_samples
+    train_paragraphs = paragraphs_data[:train_count] * FLAGS.num_repeats
+    valid_paragraphs = paragraphs_data[train_count: train_count + valid_count] * FLAGS.num_repeats
+    test_paragraphs = paragraphs_data[train_count + valid_count:] * FLAGS.num_repeats
+    del paragraphs_data
 
     tf.logging.info('Processing test dataset ({} paragraphs)'.format(test_count))
-    test_dataset = make_dataset(test_smaples, FLAGS.doc_size, 1)
+    test_augmented = augment_dataset(test_paragraphs)
+    test_tokenized = tokenize_dataset(test_augmented)
+    test_dataset = make_dataset(test_tokenized, FLAGS.doc_size)
     write_dataset(FLAGS.dest_path, 'test', base_name, FLAGS.rec_size, test_dataset)
-    del test_dataset
+    del test_paragraphs, test_augmented, test_tokenized, test_dataset
 
-    tf.logging.info('Processing validation dataset ({} paragraphs)'.format(valid_count))
-    valid_dataset = make_dataset(valid_smaples, FLAGS.doc_size, 1)
+    tf.logging.info('Processing valid dataset ({} paragraphs)'.format(valid_count))
+    valid_augmented = augment_dataset(valid_paragraphs)
+    valid_tokenized = tokenize_dataset(valid_augmented)
+    valid_dataset = make_dataset(valid_tokenized, FLAGS.doc_size)
     write_dataset(FLAGS.dest_path, 'valid', base_name, FLAGS.rec_size, valid_dataset)
-    del valid_dataset
+    del valid_paragraphs, valid_augmented, valid_tokenized, valid_dataset
 
-    tf.logging.info('Processing training dataset ({} paragraphs)'.format(train_count))
-    train_dataset = make_dataset(train_smaples, FLAGS.doc_size, FLAGS.num_repeats)
+    tf.logging.info('Processing train dataset ({} paragraphs)'.format(train_count))
+    train_augmented = augment_dataset(train_paragraphs)
+    train_tokenized = tokenize_dataset(train_augmented)
+    train_dataset = make_dataset(train_tokenized, FLAGS.doc_size)
     write_dataset(FLAGS.dest_path, 'train', base_name, FLAGS.rec_size, train_dataset)
-    del train_dataset
+    del train_paragraphs, train_augmented, train_tokenized, train_dataset
 
 
 if __name__ == "__main__":
@@ -184,12 +230,12 @@ if __name__ == "__main__":
     parser.add_argument(
         '-doc_size',
         type=int,
-        default=10,
-        help='Maximum paragraphs count per document')
+        default=500,
+        help='Maximum words count per document')
     parser.add_argument(
         '-rec_size',
         type=int,
-        default=50000,
+        default=10000,
         help='Maximum documents count per TFRecord file')
     parser.add_argument(
         '-valid_size',
