@@ -91,10 +91,13 @@ def main(argv):
     print(metrics)
 
     if len(FLAGS.export_path):
-        estimator.export_savedmodel(FLAGS.export_path, serve_input_fn(
-            ngram_minn=params.input_ngram_minn,
-            ngram_maxn=params.input_ngram_maxn
-        ))
+        estimator.export_savedmodel(
+            FLAGS.export_path, serve_input_fn(
+                ngram_minn=params.input_ngram_minn,
+                ngram_maxn=params.input_ngram_maxn
+            ),
+            strip_default_attrs=True
+        )
 
 
 if __name__ == "__main__":

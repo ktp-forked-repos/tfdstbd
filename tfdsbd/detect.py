@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import argparse
 import os
 import re
 import sys
@@ -8,6 +9,7 @@ from tfunicode import transform_normalize_unicode,transform_lower_case, transfor
 from tensorflow.contrib.saved_model import get_signature_def_by_key
 from tensorflow.python.saved_model import loader
 from tensorflow.python.tools import saved_model_utils
+from tensorflow.python.estimator.canned import prediction_keys
 import tensorflow as tf
 
 
@@ -49,23 +51,57 @@ class SentenceBoundaryDetector:
         assert isinstance(documents, list)
 
         predictions = self._predict(documents)
-        assert 'tokens' in predictions
-        assert 'classes' in predictions
+        classes_key = prediction_keys.PredictionKeys.CLASSES
+        assert 'words' in predictions
+        assert classes_key in predictions
 
         results = []
-        for tokens, classes in zip(predictions['tokens'], predictions['classes']):
+        for tokens, classes in zip(predictions['words'], predictions[classes_key]):
             assert len(tokens) == len(classes)
 
             sentences = []
             buffer = []
             for t, c in zip(tokens, classes):
                 buffer.append(t)
-                if c:
+                if b'B' == c:
                     sentences.append(b''.join(buffer).decode('utf-8'))
-                    buffer.clear()
+                    buffer = []
             sentences = [re.sub('\s+', ' ', s).strip() for s in sentences]
             sentences = [s for s in sentences if len(s)]
 
             results.append(sentences)
 
         return results
+
+
+def main(argv):
+    del argv
+
+    file_name = FLAGS.src_file.name
+    FLAGS.src_file.close()
+
+    with open(file_name, 'rb') as src_file:
+        document = src_file.read().decode('utf-8')
+
+    sbd = SentenceBoundaryDetector(FLAGS.model_dir)
+    sentences = sbd.detect([document])
+    print('\n\n'.join(sentences))
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description='Split text document to sentences')
+    parser.add_argument(
+        'model_dir',
+        type=str,
+        help='Exported model directory')
+    parser.add_argument(
+        'src_file',
+        type=argparse.FileType('rb'),
+        help='Input text file')
+
+    FLAGS, unparsed = parser.parse_known_args()
+    assert os.path.exists(FLAGS.model_dir) and os.path.isdir(FLAGS.model_dir)
+
+    tf.logging.set_verbosity(tf.logging.INFO)
+    tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)
