@@ -11,7 +11,7 @@ from nlpvocab import Vocabulary
 from tf1 import f1_score
 from tfseqestimator import SequenceItemsClassifier
 from tensorflow.python.estimator.canned import prediction_keys
-from .input import input_feature_columns, train_input_fn  # , serve_input_fn
+from .input import input_feature_columns, train_input_fn, serve_input_fn
 from .param import build_hparams
 
 
@@ -78,7 +78,7 @@ def main(argv):
 
     # Save vocabulary for TensorBoard
     ngram_vocab.update(['<UNK_{}>'.format(i) for i in range(params.input_ngram_oov)])
-    ngram_vocab.save(os.path.join(FLAGS.model_path, 'vocabulary.tsv'), Vocabulary.FORMAT_TSV_WITHOUT_HEADERS)
+    ngram_vocab.save(os.path.join(FLAGS.model_path, 'vocabulary.tsv'), Vocabulary.FORMAT_TSV_WITH_HEADERS)
 
     # Run evaluation
     eval_wildcard = os.path.join(FLAGS.data_path, 'valid*.tfrecords.gz')
@@ -90,11 +90,11 @@ def main(argv):
     ))
     print(metrics)
 
-    # if len(FLAGS.export_path):
-    #     # feature_inputs = {
-    #     #     'age': tf.placeholder(dtype=tf.float32, shape=[1, 1], name='age'),
-    #     # tf.estimator.export.build_raw_serving_input_receiver_fn(feature_inputs)
-    #     estimator.export_savedmodel(FLAGS.export_path, serve_input_fn)
+    if len(FLAGS.export_path):
+        estimator.export_savedmodel(FLAGS.export_path, serve_input_fn(
+            ngram_minn=params.input_ngram_minn,
+            ngram_maxn=params.input_ngram_maxn
+        ))
 
 
 if __name__ == "__main__":
