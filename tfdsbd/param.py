@@ -7,7 +7,7 @@ from tensorflow.contrib.training import HParams
 from tfseqestimator import RnnType, DenseActivation
 
 
-def build_hparams(values_json):
+def build_hparams(custom_params):
     params = HParams(
         input_ngram_minn=3,
         input_ngram_maxn=3,
@@ -29,6 +29,6 @@ def build_hparams(values_json):
     )
     params.set_hparam('model_dense_layers', [])
 
-    params.parse_json(values_json)
+    params.override_from_dict(custom_params)
 
     return params

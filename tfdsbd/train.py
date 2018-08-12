@@ -12,9 +12,9 @@ from .input import input_feature_columns, train_input_fn, serve_input_fn
 from .param import build_hparams
 
 
-def train_eval_export(ngram_vocab, raw_params, data_path, model_path, export_path, train_repeat=1, eval_first=True):
+def train_eval_export(ngram_vocab, custom_params, data_path, model_path, export_path, train_repeat=1, eval_first=True):
     # Prepare hyperparameters
-    params = build_hparams(raw_params)
+    params = build_hparams(custom_params)
 
     # Prepare sequence estimator
     sequence_feature_columns = input_feature_columns(
@@ -70,7 +70,7 @@ def train_eval_export(ngram_vocab, raw_params, data_path, model_path, export_pat
     if metrics['precision'] + metrics['recall'] > 0:
         metrics['f1'] = 2 * metrics['precision'] * metrics['recall'] / (metrics['precision'] + metrics['recall'])
 
-    if len(export_path):
+    if export_path:
         estimator.export_savedmodel(
             export_path, serve_input_fn(
                 ngram_minn=params.input_ngram_minn,

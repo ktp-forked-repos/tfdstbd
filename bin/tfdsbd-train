@@ -5,6 +5,7 @@ from __future__ import division
 from __future__ import print_function
 
 import argparse
+import json
 import os
 import sys
 import tensorflow as tf
@@ -19,9 +20,17 @@ def main(argv):
     ngram_vocab = Vocabulary.load(FLAGS.ngram_vocab, format=Vocabulary.FORMAT_BINARY_PICKLE)
 
     # Load hyperparams
-    raw_params = FLAGS.hyper_params.read()
+    custom_params = json.loads(FLAGS.hyper_params.read())
 
-    metrics = train_eval_export(ngram_vocab, raw_params, FLAGS.data_path, FLAGS.model_path, FLAGS.export_path, True)
+    metrics = train_eval_export(
+        ngram_vocab=ngram_vocab,
+        custom_params=custom_params,
+        data_path=FLAGS.data_path,
+        model_path=FLAGS.model_path,
+        export_path=FLAGS.export_path,
+        train_repeat=1,
+        eval_first=True
+    )
     print(metrics)
 
 
