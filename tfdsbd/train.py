@@ -8,9 +8,7 @@ import os
 import sys
 import tensorflow as tf
 from nlpvocab import Vocabulary
-from tf1 import f1_score
 from tfseqestimator import SequenceItemsClassifier
-from tensorflow.python.estimator.canned import prediction_keys
 from .input import input_feature_columns, train_input_fn, serve_input_fn
 from .param import build_hparams
 
@@ -50,25 +48,13 @@ def main(argv):
         model_dir=FLAGS.model_path,
     )
 
-    # Add F1 metric
-    # def additional_metrics(labels, predictions):
-    #     return {
-    #         'f1': f1_score(
-    #             labels=labels,
-    #             predictions=predictions[prediction_keys.PredictionKeys.CLASS_IDS],
-    #         )
-    #     }
-    #
-    # estimator = tf.contrib.estimator.add_metrics(estimator, additional_metrics)
-
     # Forward splitted words
-    # https://towardsdatascience.com/how-to-extend-a-canned-tensorflow-estimator-to-add-more-evaluation-metrics-and-to-pass-through-ddf66cd3047d
     estimator = tf.contrib.estimator.forward_features(estimator, 'words')
 
     # Run training
     # hook = tf.train.ProfilerHook(save_steps=2, output_dir=FLAGS.model_path, show_memory=True)
     train_wildcard = os.path.join(FLAGS.data_path, 'train*.tfrecords.gz')
-    train_steps = None if os.path.exists(FLAGS.model_path) else 1
+    train_steps = None if os.path.exists(FLAGS.model_path) else 1  # Make evaluation after first step
     estimator.train(input_fn=lambda: train_input_fn(
         wild_card=train_wildcard,
         batch_size=params.input_batch_size,
@@ -88,9 +74,12 @@ def main(argv):
         ngram_minn=params.input_ngram_minn,
         ngram_maxn=params.input_ngram_maxn
     ))
+    metrics['f1'] = 0.
+    if metrics['precision'] + metrics['recall'] > 0:
+        metrics['f1'] = 2 * metrics['precision'] * metrics['recall'] / (metrics['precision'] + metrics['recall'])
     print(metrics)
 
-    if len(FLAGS.export_path):
+    if len(FLAGS.export_path) and train_steps is None:
         estimator.export_savedmodel(
             FLAGS.export_path, serve_input_fn(
                 ngram_minn=params.input_ngram_minn,

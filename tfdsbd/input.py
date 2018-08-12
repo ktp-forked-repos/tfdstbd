@@ -84,6 +84,6 @@ def serve_input_fn(ngram_minn, ngram_maxn):
         documents = tf.placeholder(dtype=tf.string, shape=[None], name='documents')
         features = features_from_documens(documents, ngram_minn, ngram_maxn)
 
-        return tf.estimator.export.ServingInputReceiver(features, features.copy())
+        return tf.estimator.export.ServingInputReceiver(features, documents)
 
     return serving_input_receiver_fn

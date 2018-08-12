@@ -52,15 +52,15 @@ class TestAugmentDataset(unittest.TestCase):
             [u'Single sentence.'],
         ]
         expected = [
-            [u'First sentence in paragraph.\n', u'Second sentence in paragraph.  '],
-            [u'Single sentence.  '],
+            [u'First sentence in paragraph.\t', u'Second sentence in  paragraph.\n'],
+            [u'Single sentence.\t'],
         ]
         result = augment_dataset(source, 100)
         self.assertEqual(expected, result)
 
     def testSpaces(self):
         source = [[u'Single sentence', u'Next single sentence']]
-        expected = [[u'Single sentence\n', u'Next single sentence ']]
+        expected = [[u'Single sentence ', u'Next single sentence ']]
         result = augment_dataset(source, 100)
         self.assertEqual(expected, result)
 
@@ -104,23 +104,26 @@ class TestTokenizeDataset(unittest.TestCase):
 
 
 class TestMakeDataset(unittest.TestCase):
+    def setUp(self):
+        np.random.seed(4)
+
     def testEmpty(self):
         source = []
         result = make_dataset(source, 2)
         self.assertEqual([], result)
 
-    def testDocNoDot(self):
+    def testNormal(self):
         source = [
             [
-                [u'First', u' ', u'sentence', u' ', u'in', u' ', u'paragraph', u'.', u' ', u'\t'],
-                [u'Second', u'   ', u'sentence', u' ', u'in', u' ', u'paragraph', u'.', u' '],
+                [u'Single', u' ', u'sentence', u'.', u'\r\n'],
             ],
             [
                 [u'Another', u' ', u'sentence', u'.', u'\n'],
             ],
             [
-                [u'Single', u' ', u'sentence', u'.', u'\r\n'],
-            ]
+                [u'First', u' ', u'sentence', u' ', u'in', u' ', u'paragraph', u'.', u' ', u'\t'],
+                [u'Second', u'   ', u'sentence', u' ', u'in', u' ', u'paragraph', u'.', u' '],
+            ],
         ]
 
         expected_documents = [
@@ -143,6 +146,7 @@ class TestMakeDataset(unittest.TestCase):
         result_documents, result_labels = zip(*result)
         result_documents, result_labels = list(result_documents), list(result_labels)
 
+        print(result_documents)
         self.assertEqual(expected_documents, result_documents)
         self.assertEqual(expected_labels, result_labels)
 

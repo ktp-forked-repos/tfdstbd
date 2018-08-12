@@ -1,4 +1,1 @@
-Baseline: forward dynamic rnn, 8,5K steps
-Accuracy 0.9989
-F1 0.9819
-
+Baseline after 3 runs: {'accuracy': 0.96334475, 'accuracy_baseline': 0.96334475, 'auc': 0.5723163, 'auc_precision_recall': 0.09823781, 'average_loss': 0.31047523, 'label/mean': 0.03665527, 'loss': 3426.3008, 'precision': 0.0, 'prediction/mean': 0.23483902, 'recall': 0.0, 'global_step': 25234}

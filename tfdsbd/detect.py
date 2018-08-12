@@ -4,8 +4,7 @@ import os
 import re
 import sys
 
-from tfunicode import transform_normalize_unicode,transform_lower_case, transform_zero_digits, \
-    transform_wrap_with, transform_upper_case,  expand_split_words, expand_char_ngrams, expand_split_chars
+import tfunicode
 from tensorflow.contrib.saved_model import get_signature_def_by_key
 from tensorflow.python.saved_model import loader
 from tensorflow.python.tools import saved_model_utils
@@ -60,13 +59,20 @@ class SentenceBoundaryDetector:
             assert len(tokens) == len(classes)
 
             sentences = []
-            buffer = []
+            words = []
             for t, c in zip(tokens, classes):
-                buffer.append(t)
+                if b'' == t:
+                    continue
+
+                words.append(t)
+
                 if b'B' == c:
-                    sentences.append(b''.join(buffer).decode('utf-8'))
-                    buffer = []
-            sentences = [re.sub('\s+', ' ', s).strip() for s in sentences]
+                    sentences.append(b''.join(words).decode('utf-8'))
+                    words = []
+
+            sentences.append(b''.join(words).decode('utf-8'))
+
+            sentences = [re.sub('\s+', ' ', s.strip()) for s in sentences]
             sentences = [s for s in sentences if len(s)]
 
             results.append(sentences)
@@ -85,7 +91,7 @@ def main(argv):
 
     sbd = SentenceBoundaryDetector(FLAGS.model_dir)
     sentences = sbd.detect([document])
-    print('\n\n'.join(sentences))
+    print('\n\n--------------------------------------------------------------------------------\n\n'.join(sentences[0]))
 
 
 if __name__ == "__main__":

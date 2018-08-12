@@ -23,7 +23,6 @@ setup(
         'tfseqestimator>=1.1.0',
         'tfscc3d>=1.0.0',
         'tfunicode>=1.4.4',
-        'tf1>=1.0.1',
         'nlpvocab>=1.0.0',
     ],
     test_suite='nose.collector',

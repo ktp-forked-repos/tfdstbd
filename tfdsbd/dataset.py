@@ -34,7 +34,8 @@ def parse_dataset(raw_content):
 
 
 def _make_glue_values(max_spaces, max_tabs, max_newlines, reserve):
-    glue_values = [' '] * np.random.randint(1, (max_spaces + 1) * reserve) + \
+    glue_values = [' '] * np.random.randint(1, (max_spaces * 0.95 + 1) * reserve) + \
+                  [u'\u00A0'] * np.random.randint(1, (max_spaces * 0.05 + 1) * reserve) + \
                   ['\t'] * np.random.randint(0, (max_tabs + 1) * reserve) + \
                   ['\n'] * np.random.randint(0, int(max_newlines * 0.9 + 1) * reserve) + \
                   ['\r\n'] * np.random.randint(0, int(max_newlines * 0.1 + 1) * reserve)
