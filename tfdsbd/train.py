@@ -70,7 +70,7 @@ def train_eval_export(ngram_vocab, raw_params, data_path, model_path, export_pat
     if metrics['precision'] + metrics['recall'] > 0:
         metrics['f1'] = 2 * metrics['precision'] * metrics['recall'] / (metrics['precision'] + metrics['recall'])
 
-    if len(export_path) and train_steps is None:
+    if len(export_path):
         estimator.export_savedmodel(
             export_path, serve_input_fn(
                 ngram_minn=params.input_ngram_minn,
