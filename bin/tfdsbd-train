@@ -1,4 +1,5 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python
+
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -7,41 +8,25 @@ import argparse
 import os
 import sys
 import tensorflow as tf
-from .input import train_input_fn
-from .param import build_hparams
+from nlpvocab import Vocabulary
+from tfdsbd.train import train_eval_export
 
 
 def main(argv):
     del argv
 
-    # Prepare hyperparameters
-    params = build_hparams(FLAGS.hyper_params.read())
+    # Load vocabulary
+    ngram_vocab = Vocabulary.load(FLAGS.ngram_vocab, format=Vocabulary.FORMAT_BINARY_PICKLE)
 
-    # Run training
-    # hook = tf.train.ProfilerHook(save_steps=2, output_dir=FLAGS.model_path, show_memory=True)
-    train_wildcard = os.path.join(FLAGS.data_path, 'train*.tfrecords.gz')
-    dataset = train_input_fn(
-        wild_card=train_wildcard,
-        batch_size=1,
-        ngram_minn=params.input_ngram_minn,
-        ngram_maxn=params.input_ngram_maxn
-    )
-    iterator = dataset.make_one_shot_iterator()
-    features, labels = iterator.get_next()
+    # Load hyperparams
+    raw_params = FLAGS.hyper_params.read()
 
-    with tf.Session() as sess:
-        while True:
-            words_value, labels_value = sess.run([features['words_out'], labels])
-            if len(words_value[0]) != len(labels_value[0]):
-                # print([[w.decode('utf-8') for w in words_value[0]], labels_value[0]])
-                for i in range(min(len(words_value[0]), len(labels_value[0]))):
-                    print([words_value[0][i].decode('utf-8'), labels_value[0][i].decode('utf-8')])
-                break
+    metrics = train_eval_export(ngram_vocab, raw_params, FLAGS.data_path, FLAGS.model_path, FLAGS.export_path, True)
+    print(metrics)
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description='Train, evaluate and export SBD model')
+    parser = argparse.ArgumentParser(description='Train, evaluate and export tfdsbd model')
     parser.add_argument(
         'data_path',
         type=str,
@@ -53,7 +38,7 @@ if __name__ == "__main__":
     parser.add_argument(
         'hyper_params',
         type=argparse.FileType('rb'),
-        help='JSON-encoded model hyperparams file')
+        help='JSON-encoded model hyperparameters file')
     parser.add_argument(
         'model_path',
         type=str,

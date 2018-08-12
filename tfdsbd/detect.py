@@ -1,15 +1,15 @@
-# -*- coding: utf-8 -*-
-import argparse
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
 import os
 import re
-import sys
-
-import tfunicode
+import tensorflow as tf
+import tfunicode  # required to load custom ops
 from tensorflow.contrib.saved_model import get_signature_def_by_key
 from tensorflow.python.saved_model import loader
 from tensorflow.python.tools import saved_model_utils
 from tensorflow.python.estimator.canned import prediction_keys
-import tensorflow as tf
 
 
 class SentenceBoundaryDetector:
@@ -78,36 +78,3 @@ class SentenceBoundaryDetector:
             results.append(sentences)
 
         return results
-
-
-def main(argv):
-    del argv
-
-    file_name = FLAGS.src_file.name
-    FLAGS.src_file.close()
-
-    with open(file_name, 'rb') as src_file:
-        document = src_file.read().decode('utf-8')
-
-    sbd = SentenceBoundaryDetector(FLAGS.model_dir)
-    sentences = sbd.detect([document])
-    print('\n\n--------------------------------------------------------------------------------\n\n'.join(sentences[0]))
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description='Split text document to sentences')
-    parser.add_argument(
-        'model_dir',
-        type=str,
-        help='Exported model directory')
-    parser.add_argument(
-        'src_file',
-        type=argparse.FileType('rb'),
-        help='Input text file')
-
-    FLAGS, unparsed = parser.parse_known_args()
-    assert os.path.exists(FLAGS.model_dir) and os.path.isdir(FLAGS.model_dir)
-
-    tf.logging.set_verbosity(tf.logging.INFO)
-    tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)

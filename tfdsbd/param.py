@@ -24,7 +24,7 @@ def build_hparams(values_json):
         model_dense_activation=DenseActivation.RELU,
         model_dense_dropout=0.,
         train_train_optimizer="Adam",
-        train_learning_rate=0.001,
+        train_learning_rate=0.05,
         train_loss_reduction=tf.losses.Reduction.SUM
     )
     params.set_hparam('model_dense_layers', [])

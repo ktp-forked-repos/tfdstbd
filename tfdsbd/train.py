@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -13,14 +12,9 @@ from .input import input_feature_columns, train_input_fn, serve_input_fn
 from .param import build_hparams
 
 
-def main(argv):
-    del argv
-
-    # Load vocabulary
-    ngram_vocab = Vocabulary.load(FLAGS.ngram_vocab, format=Vocabulary.FORMAT_BINARY_PICKLE)
-
+def train_eval_export(ngram_vocab, raw_params, data_path, model_path, export_path, train_repeat=1, eval_first=True):
     # Prepare hyperparameters
-    params = build_hparams(FLAGS.hyper_params.read())
+    params = build_hparams(raw_params)
 
     # Prepare sequence estimator
     sequence_feature_columns = input_feature_columns(
@@ -32,42 +26,40 @@ def main(argv):
     estimator = SequenceItemsClassifier(
         label_vocabulary=['N', 'B'],  # Not a boundary, Boundary
         loss_reduction=params.train_loss_reduction,
-        model_params={
-            'sequence_dropout': params.model_sequence_dropout,
-            'context_dropout': params.model_context_dropout,
-            'rnn_type': params.model_rnn_type,
-            'rnn_layers': params.model_rnn_layers,
-            'rnn_dropout': params.model_rnn_dropout,
-            'dense_layers': params.model_dense_layers,
-            'dense_activation': params.model_dense_activation,
-            'dense_dropout': params.model_dense_dropout,
-            'train_optimizer': params.train_train_optimizer,
-            'learning_rate': params.train_learning_rate,
-        },
         sequence_columns=sequence_feature_columns,
-        model_dir=FLAGS.model_path,
+        sequence_dropout=params.model_sequence_dropout,
+        rnn_type=params.model_rnn_type,
+        rnn_layers=params.model_rnn_layers,
+        rnn_dropout=params.model_rnn_dropout,
+        dense_layers=params.model_dense_layers,
+        dense_activation=params.model_dense_activation,
+        dense_dropout=params.model_dense_dropout,
+        dense_norm=False,
+        train_optimizer=params.train_train_optimizer,
+        learning_rate=params.train_learning_rate,
+        model_dir=model_path,
     )
 
     # Forward splitted words
     estimator = tf.contrib.estimator.forward_features(estimator, 'words')
 
     # Run training
-    # hook = tf.train.ProfilerHook(save_steps=2, output_dir=FLAGS.model_path, show_memory=True)
-    train_wildcard = os.path.join(FLAGS.data_path, 'train*.tfrecords.gz')
-    train_steps = None if os.path.exists(FLAGS.model_path) else 1  # Make evaluation after first step
-    estimator.train(input_fn=lambda: train_input_fn(
-        wild_card=train_wildcard,
-        batch_size=params.input_batch_size,
-        ngram_minn=params.input_ngram_minn,
-        ngram_maxn=params.input_ngram_maxn
-    ), steps=train_steps)
+    train_wildcard = os.path.join(data_path, 'train*.tfrecords.gz')
+    for _ in range(train_repeat):
+        train_steps = 1 if eval_first and not os.path.exists(model_path) else None  # Make evaluation after first step
+        estimator.train(input_fn=lambda: train_input_fn(
+            wild_card=train_wildcard,
+            batch_size=params.input_batch_size,
+            ngram_minn=params.input_ngram_minn,
+            ngram_maxn=params.input_ngram_maxn
+        ), steps=train_steps)
 
     # Save vocabulary for TensorBoard
     ngram_vocab.update(['<UNK_{}>'.format(i) for i in range(params.input_ngram_oov)])
-    ngram_vocab.save(os.path.join(FLAGS.model_path, 'vocabulary.tsv'), Vocabulary.FORMAT_TSV_WITH_HEADERS)
+    ngram_vocab.save(os.path.join(model_path, 'vocabulary.tsv'), Vocabulary.FORMAT_TSV_WITH_HEADERS)
 
     # Run evaluation
-    eval_wildcard = os.path.join(FLAGS.data_path, 'valid*.tfrecords.gz')
+    eval_wildcard = os.path.join(data_path, 'valid*.tfrecords.gz')
     metrics = estimator.evaluate(input_fn=lambda: train_input_fn(
         wild_card=eval_wildcard,
         batch_size=params.input_batch_size,
@@ -77,48 +69,14 @@ def main(argv):
     metrics['f1'] = 0.
     if metrics['precision'] + metrics['recall'] > 0:
         metrics['f1'] = 2 * metrics['precision'] * metrics['recall'] / (metrics['precision'] + metrics['recall'])
-    print(metrics)
 
-    if len(FLAGS.export_path) and train_steps is None:
+    if len(export_path) and train_steps is None:
         estimator.export_savedmodel(
-            FLAGS.export_path, serve_input_fn(
+            export_path, serve_input_fn(
                 ngram_minn=params.input_ngram_minn,
                 ngram_maxn=params.input_ngram_maxn
             ),
             strip_default_attrs=True
         )
 
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description='Train, evaluate and export SBD model')
-    parser.add_argument(
-        'data_path',
-        type=str,
-        help='Directory with TFRecord files')
-    parser.add_argument(
-        'ngram_vocab',
-        type=str,
-        help='Pickle-encoded ngram vocabulary file')
-    parser.add_argument(
-        'hyper_params',
-        type=argparse.FileType('rb'),
-        help='JSON-encoded model hyperparams file')
-    parser.add_argument(
-        'model_path',
-        type=str,
-        help='Path to store model checkpoints')
-    parser.add_argument(
-        '-export_path',
-        type=str,
-        default='',
-        help='Path to store exported model')
-
-    FLAGS, unparsed = parser.parse_known_args()
-    assert os.path.exists(FLAGS.data_path) and os.path.isdir(FLAGS.data_path)
-    assert os.path.exists(FLAGS.ngram_vocab) and os.path.isfile(FLAGS.ngram_vocab)
-    assert not os.path.exists(FLAGS.model_path) or os.path.isdir(FLAGS.model_path)
-    assert not os.path.exists(FLAGS.export_path) or os.path.isdir(FLAGS.export_path)
-
-    tf.logging.set_verbosity(tf.logging.INFO)
-    tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)
+    return metrics
