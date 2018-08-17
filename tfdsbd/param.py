@@ -12,6 +12,7 @@ def build_hparams(custom_params):
         ngram_minn=3,
         ngram_maxn=3,
         ngram_dimension=3,
+        ngram_freq=100,
         ngram_oov=1,
         ngram_combiner='sum',
         batch_size=20,

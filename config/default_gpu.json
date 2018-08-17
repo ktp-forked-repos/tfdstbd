@@ -7,7 +7,7 @@
   "ngram_combiner": "mean",
   "batch_size": 50,
   "sequence_dropout": 0.1,
-  "rnn_type": "regular_bidirectional_lstm",
+  "rnn_type": "cudnn_bidirectional_lstm",
   "rnn_layers": [
     32
   ],

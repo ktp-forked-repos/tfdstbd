@@ -49,23 +49,17 @@ def main():
         'ngram_vocab',
         type=str,
         help='Output vocabulary file')
-    parser.add_argument(
-        '-min_freq',
-        type=int,
-        default=100,
-        help='Minimum ngram frequency to leave it in vocabulary')
 
     argv, unparsed = parser.parse_known_args()
     assert os.path.exists(argv.src_path) and os.path.isdir(argv.src_path)
-    assert 0 <= argv.min_freq
 
     tf.logging.set_verbosity(tf.logging.INFO)
 
     params = build_hparams(json.loads(argv.hyper_params.read()))
     assert 0 < params.ngram_minn <= params.ngram_maxn
 
-    tf.logging.info('Processing training vocabulary with min freq {}'.format(argv.min_freq))
-    vocab = extract_vocab(argv.src_path, params.ngram_minn, params.ngram_maxn, argv.min_freq, params.batch_size)
+    tf.logging.info('Processing training vocabulary with min freq {}'.format(params.ngram_freq))
+    vocab = extract_vocab(argv.src_path, params.ngram_minn, params.ngram_maxn, params.ngram_freq, params.batch_size)
 
     vocab.save(argv.ngram_vocab, Vocabulary.FORMAT_BINARY_PICKLE)
     vocab.save(os.path.splitext(argv.ngram_vocab)[0] + '.tsv', Vocabulary.FORMAT_TSV_WITH_HEADERS)
