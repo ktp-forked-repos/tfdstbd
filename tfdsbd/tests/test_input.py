@@ -10,7 +10,7 @@ from ..input import train_input_fn
 
 class TestTrainInputFn(tf.test.TestCase):
     def testNormal(self):
-        wildcard = os.path.join(os.path.dirname(__file__), 'data', 'train*.tfrecords.gz')
+        wildcard = os.path.join(os.path.dirname(__file__), 'data', '*.tfrecords.gz')
         batch_size = 2
 
         dataset = train_input_fn(wildcard, batch_size, 1, 1)

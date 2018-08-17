@@ -115,31 +115,25 @@ class TestMakeDataset(unittest.TestCase):
     def testNormal(self):
         source = [
             [
-                [u'Single', u' ', u'sentence', u'.', u'\r\n'],
+                ['Single', ' ', 'sentence', '.', '\r\n'],
             ],
             [
-                [u'Another', u' ', u'sentence', u'.', u'\n'],
+                ['Another', ' ', 'sentence', '.', '\n'],
             ],
             [
-                [u'First', u' ', u'sentence', u' ', u'in', u' ', u'paragraph', u'.', u' ', u'\t'],
-                [u'Second', u'   ', u'sentence', u' ', u'in', u' ', u'paragraph', u'.', u' '],
+                ['First', ' ', 'sentence', ' ', 'in', ' ', 'paragraph', '.', ' ', '\t'],
+                ['Second', '   ', 'sentence', ' ', 'in', ' ', 'paragraph', '.', ' '],
             ],
         ]
 
         expected_documents = [
-            u'First sentence in paragraph. \tSecond   sentence in paragraph. ',
-            u'Another sentence.\nSingle sentence.\r\n',
+            'First sentence in paragraph. \tSecond   sentence in paragraph. ',
+            'Another sentence.\nSingle sentence.\r\n',
         ]
 
         expected_labels = [
-            [
-                u'N', u'N', u'N', u'N', u'N', u'N', u'N', u'N', u'B', u'B',
-                u'N', u'N', u'N', u'N', u'N', u'N', u'N', u'N', u'B'
-            ],
-            [
-                u'N', u'N', u'N', u'N', u'B',
-                u'N', u'N', u'N', u'N', u'B'
-            ],
+            'N,N,N,N,N,N,N,N,B,B,N,N,N,N,N,N,N,N,B',
+            'N,N,N,N,B,N,N,N,N,B',
         ]
 
         result = make_dataset(source, doc_size=15)
@@ -161,22 +155,16 @@ class TestWriteDataset(tf.test.TestCase):
     def testNormal(self):
         source = [
             (
-                u'First sentence in paragraph. \tSecond   sentence in paragraph. ',
-                [
-                    u'N', u'N', u'N', u'N', u'N', u'N', u'N', u'N', u'B', u'B',
-                    u'N', u'N', u'N', u'N', u'N', u'N', u'N', u'N', u'B'
-                ]
+                'First sentence in paragraph. \tSecond   sentence in paragraph. ',
+                'N,N,N,N,N,N,N,N,B,B,N,N,N,N,N,N,N,N,B',
             ),
             (
-                u'Another sentence.\nSingle sentence.\r\n',
-                [
-                    u'N', u'N', u'N', u'N', u'B',
-                    u'N', u'N', u'N', u'N', u'B'
-                ],
+                'Another sentence.\nSingle sentence.\r\n',
+                'N,N,N,N,B,N,N,N,N,B',
             )
         ]
 
-        write_dataset(self.temp_dir, 'test', 'buffer', 100, source)
+        write_dataset(self.temp_dir, 'buffer', source)
 
         wildcard = os.path.join(self.temp_dir, '*.tfrecords.gz')
         dataset = train_input_fn(wildcard, 1, 1, 1)
@@ -188,8 +176,8 @@ class TestWriteDataset(tf.test.TestCase):
         with self.test_session() as sess:
             document_value, labels_value = sess.run([document, labels])
             self.assertEqual(source[0][0], document_value[0].decode('utf-8'))
-            self.assertEqual(source[0][1], [l.decode('utf-8') for l in labels_value[0]])
+            self.assertEqual(source[0][1], b','.join(labels_value[0]).decode('utf-8'))
 
             document_value, labels_value = sess.run([document, labels])
             self.assertEqual(source[1][0], document_value[0].decode('utf-8'))
-            self.assertEqual(source[1][1], [l.decode('utf-8') for l in labels_value[0]])
+            self.assertEqual(source[1][1], b','.join(labels_value[0]).decode('utf-8'))

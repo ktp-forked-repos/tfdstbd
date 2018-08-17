@@ -3,17 +3,13 @@ from __future__ import division
 from __future__ import print_function
 
 import argparse
-import itertools
-import math
 import numpy as np
 import os
-import sys
 import tensorflow as tf
-from functools import partial
 from tfunicode import expand_split_words
 
 
-def parse_dataset(raw_content):
+def parse_dataset(raw_content, num_repeats=1):
     result_paragraphs = []
     for raw_paragraph in raw_content.strip().split('\n\n'):
         raw_paragraph = raw_paragraph.strip()
@@ -28,6 +24,8 @@ def parse_dataset(raw_content):
 
             result_sentences.append(raw_sentence)
         result_paragraphs.append(result_sentences)
+
+    result_paragraphs *= num_repeats
     np.random.shuffle(result_paragraphs)
 
     return result_paragraphs
@@ -131,8 +129,8 @@ def make_dataset(source_paragraphs, doc_size):
             current_paragraph = source_paragraphs.pop()
 
             for sentence in current_paragraph:
-                if len(sentence) > 1 and sentence[-2] == ' ' and sentence[-1] in ['.', '!', '?']:
-                    sentence = sentence[:-2] + sentence[-1:]
+                # if len(sentence) > 1 and sentence[-2] == ' ' and sentence[-1] in ['.', '!', '?']:
+                #     sentence = sentence[:-2] + sentence[-1:]
                 last_meaning = max([i for i, w in enumerate(sentence) if len(w.strip())])
 
                 sample_words.extend(sentence)
@@ -142,7 +140,7 @@ def make_dataset(source_paragraphs, doc_size):
                 assert len(sample_words) == len(sample_labels), 'tokens count should be equal labels count'
 
         documents.append(''.join(sample_words))
-        labels.append(sample_labels)
+        labels.append(','.join(sample_labels))
 
     dataset = list(zip(documents, labels))
     dataset.sort(key=lambda d: len(d[1]), reverse=True)  # sort from max to min length
@@ -150,80 +148,40 @@ def make_dataset(source_paragraphs, doc_size):
     return dataset
 
 
-def write_dataset(dest_path, set_title, base_name, rec_size, set_data):
+def write_dataset(dest_path, base_name, examples_batch):
     def create_example(document, labels):
         return tf.train.Example(features=tf.train.Features(feature={
             'document': tf.train.Feature(bytes_list=tf.train.BytesList(value=[tf.compat.as_bytes(document)])),
-            'labels': tf.train.Feature(bytes_list=tf.train.BytesList(value=[tf.compat.as_bytes(l) for l in labels])),
+            'labels': tf.train.Feature(bytes_list=tf.train.BytesList(value=[tf.compat.as_bytes(labels)])),
         })).SerializeToString()
 
-    if not len(set_data):
+    if not len(examples_batch):
         return
 
     try:
         os.makedirs(dest_path)
     except:
         pass
-    file_mask = os.path.join(dest_path, '{}-{}-{}.tfrecords.gz')
 
-    tfrecord_options = tf.python_io.TFRecordOptions(tf.python_io.TFRecordCompressionType.GZIP)
+    exist_pattern = '-{}.tfrecords.gz'.format(base_name)
+    exist_records = [file.split('-')[0] for file in os.listdir(dest_path) if file.endswith(exist_pattern)]
+    next_index = max([int(head) if head.isdigit() else 0 for head in exist_records] + [0]) + 1
 
-    for i in range(1 + len(set_data) // rec_size):
-        rec_data, set_data = set_data[:rec_size], set_data[rec_size:]
-        file_name = file_mask.format(set_title, base_name, i)
-        with tf.python_io.TFRecordWriter(file_name, options=tfrecord_options) as tfrecord_writer:
-            tf.logging.info('Saving {} examples in {}'.format(len(rec_data), file_name))
-            for document, labels in rec_data:
-                tfrecord_writer.write(create_example(document, labels))
+    file_name = os.path.join(dest_path, '{}-{}.tfrecords.gz'.format(next_index, base_name))
+    rec_options = tf.python_io.TFRecordOptions(tf.python_io.TFRecordCompressionType.GZIP)
 
-
-def main(argv):
-    del argv
-
-    tf.logging.info('Loading source dataset from {}'.format(FLAGS.src_file.name))
-    source_content = FLAGS.src_file.read().decode('utf-8')
-    base_name, _ = os.path.splitext(os.path.basename(FLAGS.src_file.name))
-    paragraphs_data = parse_dataset(source_content)
-
-    tf.logging.info('Splitting train/test/valid datasets')
-    samples_count = len(paragraphs_data)
-    valid_count = int(math.floor(samples_count * FLAGS.valid_size))
-    test_count = int(math.floor(samples_count * FLAGS.test_size))
-    train_count = samples_count - test_count - valid_count
-    train_paragraphs = paragraphs_data[:train_count] * FLAGS.num_repeats
-    valid_paragraphs = paragraphs_data[train_count: train_count + valid_count] * FLAGS.num_repeats
-    test_paragraphs = paragraphs_data[train_count + valid_count:] * FLAGS.num_repeats
-    del paragraphs_data
-
-    tf.logging.info('Processing test dataset ({} paragraphs)'.format(test_count))
-    test_augmented = augment_dataset(test_paragraphs)
-    test_tokenized = tokenize_dataset(test_augmented)
-    test_dataset = make_dataset(test_tokenized, FLAGS.doc_size)
-    write_dataset(FLAGS.dest_path, 'test', base_name, FLAGS.rec_size, test_dataset)
-    del test_paragraphs, test_augmented, test_tokenized, test_dataset
-
-    tf.logging.info('Processing valid dataset ({} paragraphs)'.format(valid_count))
-    valid_augmented = augment_dataset(valid_paragraphs)
-    valid_tokenized = tokenize_dataset(valid_augmented)
-    valid_dataset = make_dataset(valid_tokenized, FLAGS.doc_size)
-    write_dataset(FLAGS.dest_path, 'valid', base_name, FLAGS.rec_size, valid_dataset)
-    del valid_paragraphs, valid_augmented, valid_tokenized, valid_dataset
-
-    tf.logging.info('Processing train dataset ({} paragraphs)'.format(train_count))
-    train_augmented = augment_dataset(train_paragraphs)
-    train_tokenized = tokenize_dataset(train_augmented)
-    train_dataset = make_dataset(train_tokenized, FLAGS.doc_size)
-    write_dataset(FLAGS.dest_path, 'train', base_name, FLAGS.rec_size, train_dataset)
-    del train_paragraphs, train_augmented, train_tokenized, train_dataset
+    with tf.python_io.TFRecordWriter(file_name, options=rec_options) as tfrecord_writer:
+        for document, labels in examples_batch:
+            tfrecord_writer.write(create_example(document, labels))
 
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(
-        description='Create training/validation/testing datasets from text files with paragraph markup')
+        description='Create dataset from text files with paragraph markup')
     parser.add_argument(
         'src_file',
         type=argparse.FileType('rb'),
-        help='Text file with source dataset. Paragraphs should be divided with double \\n, sentences with single one')
+        help='Text file with paragraphs divided by double \\n, sentences by single one')
     parser.add_argument(
         'dest_path',
         type=str,
@@ -231,35 +189,53 @@ if __name__ == "__main__":
     parser.add_argument(
         '-doc_size',
         type=int,
-        default=500,
+        default=250,
         help='Maximum words count per document')
     parser.add_argument(
         '-rec_size',
         type=int,
-        default=10000,
+        default=50000,
         help='Maximum documents count per TFRecord file')
-    parser.add_argument(
-        '-valid_size',
-        type=float,
-        default=0.1,
-        help='Proportion of data to include in validation dataset')
-    parser.add_argument(
-        '-test_size',
-        type=float,
-        default=0.1,
-        help='Proportion of data to include in test dataset')
     parser.add_argument(
         '-num_repeats',
         type=int,
         default=10,
-        help='How many times repeat each dataset. Useful due sentences shuffling and random glue')
+        help='How many times repeat source data. Useful due paragraphs shuffling and random glue')
 
-    FLAGS, unparsed = parser.parse_known_args()
-    assert not os.path.exists(FLAGS.dest_path) or os.path.isdir(FLAGS.dest_path)
-    assert 0 < FLAGS.doc_size
-    assert 0 < FLAGS.rec_size
-    assert 0 <= FLAGS.valid_size + FLAGS.test_size <= 1
-    assert 0 < FLAGS.num_repeats
+    argv, _ = parser.parse_known_args()
+    assert not os.path.exists(argv.dest_path) or os.path.isdir(argv.dest_path)
+    assert 0 < argv.doc_size
+    assert 0 < argv.rec_size
+    assert 0 < argv.num_repeats
 
     tf.logging.set_verbosity(tf.logging.INFO)
-    tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)
+
+    tf.logging.info('Loading source dataset from {}'.format(argv.src_file.name))
+    source_content = argv.src_file.read().decode('utf-8')
+    base_name, _ = os.path.splitext(os.path.basename(argv.src_file.name))
+    paragraphs_data = parse_dataset(source_content, argv.num_repeats)
+
+    tf.logging.info('Processing dataset ({}K paragraphs)'.format(len(paragraphs_data) // 1000))
+    examples_queue = []
+    while len(paragraphs_data):
+        paragraphs_todo, paragraphs_data = paragraphs_data[:argv.rec_size], paragraphs_data[argv.rec_size:]
+
+        tf.logging.info('Augmenting {}K paragraphs'.format(len(paragraphs_todo) // 1000))
+        augmented_todo = augment_dataset(paragraphs_todo)
+
+        tf.logging.info('Tokenizing {}K paragraphs'.format(len(augmented_todo) // 1000))
+        tokenized_todo = tokenize_dataset(augmented_todo, batch_size=argv.doc_size)
+
+        tf.logging.info('Converting {}K paragraphs'.format(len(tokenized_todo) // 1000))
+        examples_todo = make_dataset(tokenized_todo, doc_size=argv.doc_size)
+        examples_queue.extend(examples_todo)
+
+        if len(examples_queue) >= argv.rec_size:
+            tf.logging.info('Saving dataset to {}'.format(argv.dest_path))
+            examples_todo, examples_queue = examples_queue[:argv.rec_size], examples_queue[argv.rec_size:]
+            write_dataset(argv.dest_path, base_name, examples_todo)
+
+    if len(examples_queue):
+        tf.logging.info('Saving dataset to {}'.format(argv.dest_path))
+        examples_todo, examples_queue = examples_queue[:argv.rec_size], examples_queue[argv.rec_size:]
+        write_dataset(argv.dest_path, base_name, examples_todo)

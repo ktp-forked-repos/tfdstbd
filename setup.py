@@ -18,10 +18,15 @@ setup(
     author_email='shkarupa.alex@gmail.com',
     license='MIT',
     packages=find_packages(),
-    scripts=[
-        'bin/tfdsbd-train',
-        'bin/tfdsbd-infer',
-    ],
+    entry_points={
+        'console_scripts': [
+            'tfdsbd-train=tfdsbd.train:main',
+            'tfdsbd-infer=tfdsbd.infer:main',
+            'tfdsbd-dataset=tfdsbd.dataset:main',
+            'tfdsbd-split=tfdsbd.split:main',
+            'tfdsbd-vocab=tfdsbd.vocab:main',
+        ],
+    },
     install_requires=[
         'tensorflow>=1.9.0',
         'tfseqestimator>=2.1.1',

@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import argparse
 import os
 import re
 import tensorflow as tf
@@ -46,7 +47,7 @@ class SentenceBoundaryDetector:
 
         return result
 
-    def detect(self, documents):
+    def split(self, documents):
         assert isinstance(documents, list)
 
         predictions = self._predict(documents)
@@ -78,3 +79,26 @@ class SentenceBoundaryDetector:
             results.append(sentences)
 
         return results
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Split text into tokens')
+    parser.add_argument(
+        'model_dir',
+        type=str,
+        help='Exported tfdsbd model directory')
+    parser.add_argument(
+        'src_file',
+        type=argparse.FileType('rb'),
+        help='Input text file')
+
+    argv, _ = parser.parse_known_args()
+    assert os.path.exists(argv.model_dir) and os.path.isdir(argv.model_dir)
+
+    tf.logging.set_verbosity(tf.logging.INFO)
+
+    document = argv.src_file.read().decode('utf-8')
+    sbd = SentenceBoundaryDetector(argv.model_dir)
+    tokens = sbd.split([document])
+    separator = '\n\n{}\n\n'.format('-' * 80)
+    print(separator.join(tokens[0]))

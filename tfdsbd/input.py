@@ -10,7 +10,11 @@ from tfunicode import expand_split_words
 from .feature import extract_case_length_features, extract_ngram_features
 
 
-def input_feature_columns(ngram_vocab, ngram_dimension, ngram_oov=1, ngram_combiner='sum'):
+def input_feature_columns(ngram_vocab, ngram_dimension, ngram_oov=1, ngram_combiner='sum', ngram_ckpt=None):
+    ngram_name = None
+    if ngram_ckpt is not None:
+        ngram_name = 'model/input_features/sequence_input_layer/ngrams_embedding/embedding_weights'
+
     ngram_categorial_column = sequence_categorical_column_with_vocabulary_list(
         key='ngrams',
         vocabulary_list=ngram_vocab,
@@ -21,6 +25,8 @@ def input_feature_columns(ngram_vocab, ngram_dimension, ngram_oov=1, ngram_combi
         categorical_column=ngram_categorial_column,
         dimension=ngram_dimension,
         combiner=ngram_combiner,
+        ckpt_to_load_from=ngram_ckpt,
+        tensor_name_in_ckpt=ngram_name
     )
 
     return [
@@ -53,27 +59,25 @@ def features_from_documens(documents, ngram_minn, ngram_maxn):
 
 
 def train_input_fn(wild_card, batch_size, ngram_minn, ngram_maxn):
+    def _parse_examples(examples_proto):
+        examples = tf.parse_example(
+            examples_proto,
+            features={
+                'document': tf.FixedLenFeature((), tf.string),
+                'labels': tf.FixedLenFeature((), tf.string),
+            })
+
+        features = features_from_documens(examples['document'], ngram_minn, ngram_maxn)
+        labels = tf.string_split(examples['labels'], delimiter=',')
+        labels = tf.sparse_tensor_to_dense(labels, default_value='B')
+
+        return features, labels
+
     with tf.name_scope('input'):
         files = tf.data.Dataset.list_files(wild_card)
         dataset = tf.data.TFRecordDataset(files, compression_type='GZIP', num_parallel_reads=5)
-
         dataset = dataset.batch(batch_size)
-
-        def _parse_examples(examples_proto):
-            examples = tf.parse_example(
-                examples_proto,
-                features={
-                    'document': tf.FixedLenFeature(1, tf.string),
-                    'labels': tf.VarLenFeature(tf.string),
-                })
-
-            documents = tf.squeeze(examples['document'], axis=1)
-            labels = tf.sparse_tensor_to_dense(examples['labels'], default_value='B')
-            features = features_from_documens(documents, ngram_minn, ngram_maxn)
-
-            return features, labels
-
-        dataset = dataset.map(_parse_examples, num_parallel_calls=32)
+        dataset = dataset.map(_parse_examples, num_parallel_calls=10)
         dataset = dataset.prefetch(10)
 
         return dataset
