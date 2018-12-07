@@ -22,7 +22,7 @@ class TestTrainInputFn(tf.test.TestCase):
 
         self.assertEqual(dict, type(features))
         self.assertEqual([
-            'documents',
+            'document',
             'is_lower_case',
             'is_mixed_case',
             'is_no_case',
@@ -32,12 +32,16 @@ class TestTrainInputFn(tf.test.TestCase):
             'word_length',
             'words',
         ], sorted(features.keys()))
-        self.assertEqual(batch_size, len(features['documents']))
-        self.assertEqual(2, len(labels.shape))
-        self.assertEqual(batch_size, labels.shape[0])
+        self.assertEqual(batch_size, len(features['document']))
 
-        self.assertAllEqual(labels.shape, features['words'].shape)
-        self.assertAllEqual(labels.shape, features['word_length'].dense_shape)
+        self.assertEqual(dict, type(labels))
+        self.assertEqual(['sentences', 'tokens'], sorted(labels.keys()))
+
+        self.assertEqual(2, len(labels['tokens'].shape))
+        self.assertEqual(batch_size, labels['sentences'].shape[0])
+
+        self.assertAllEqual(labels['tokens'].shape, features['words'].shape)
+        self.assertAllEqual(labels['sentences'].shape, features['word_length'].dense_shape)
 
 
 if __name__ == "__main__":

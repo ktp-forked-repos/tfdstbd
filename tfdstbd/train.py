@@ -7,13 +7,13 @@ import json
 import os
 import tensorflow as tf
 from nlpvocab import Vocabulary
-from tfseqestimator import SequenceItemsClassifier
+from .estimator import SentenceTokenEstimator
 from .input import input_feature_columns, train_input_fn, serve_input_fn
 from .param import build_hparams
 
 
 def train_eval_export(ngram_vocab, custom_params, model_path, train_data,
-                      eval_data=None, export_path=None, ngram_ckpt=None, eval_first=True):
+                      eval_data=None, export_path=None, eval_first=True):
     # Prepare hyperparameters
     params = build_hparams(custom_params)
 
@@ -23,9 +23,8 @@ def train_eval_export(ngram_vocab, custom_params, model_path, train_data,
         ngram_dimension=params.ngram_dimension,
         ngram_oov=params.ngram_oov,
         ngram_combiner=params.ngram_combiner,
-        ngram_ckpt=ngram_ckpt,
     )
-    estimator = SequenceItemsClassifier(
+    estimator = SentenceTokenEstimator(
         label_vocabulary=['N', 'B'],  # Not a boundary, Boundary
         loss_reduction=params.loss_reduction,
         sequence_columns=sequence_feature_columns,
@@ -87,7 +86,7 @@ def train_eval_export(ngram_vocab, custom_params, model_path, train_data,
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Train, evaluate and export tfdsbd model')
+    parser = argparse.ArgumentParser(description='Train, evaluate and export tfdstbd model')
     parser.add_argument(
         'train_data',
         type=str,
@@ -114,11 +113,6 @@ def main():
         type=str,
         default=None,
         help='Path to store exported model')
-    parser.add_argument(
-        '-ngram_ckpt',
-        type=str,
-        default=None,
-        help='Checkpoint for ngram embeddings initialization')
 
     argv, _ = parser.parse_known_args()
     assert os.path.exists(argv.train_data) and os.path.isdir(argv.train_data)
@@ -126,7 +120,6 @@ def main():
     assert not os.path.exists(argv.model_path) or os.path.isdir(argv.model_path)
     assert argv.eval_data is None or os.path.exists(argv.eval_data) and os.path.isdir(argv.eval_data)
     assert argv.export_path is None or not os.path.exists(argv.export_path) or os.path.isdir(argv.export_path)
-    assert argv.ngram_ckpt is None or os.path.exists(argv.ngram_ckpt) and os.path.isdir(argv.ngram_ckpt)
 
     tf.logging.set_verbosity(tf.logging.INFO)
 
@@ -143,7 +136,6 @@ def main():
         train_data=argv.train_data,
         eval_data=argv.eval_data,
         export_path=argv.export_path,
-        ngram_ckpt=argv.ngram_ckpt,
         eval_first=True,
     )
     if metrics is not None:

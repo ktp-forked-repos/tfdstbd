@@ -86,7 +86,7 @@ def main():
     parser.add_argument(
         'model_dir',
         type=str,
-        help='Exported tfdsbd model directory')
+        help='Exported tfdstbd model directory')
     parser.add_argument(
         'src_file',
         type=argparse.FileType('rb'),

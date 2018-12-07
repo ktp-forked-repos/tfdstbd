@@ -8,23 +8,22 @@ with open('README.md', 'r') as fh:
     long_description = fh.read()
 
 setup(
-    name='tfdsbd',
+    name='tfdstbd',
     version='1.0.0',
     description='Deep sentence boundary detection implemented with Tensorflow',
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url='https://github.com/shkarupa-alex/tfdsbd',
+    url='https://github.com/shkarupa-alex/tfdstbd',
     author='Shkarupa Alex',
     author_email='shkarupa.alex@gmail.com',
     license='MIT',
     packages=find_packages(),
     entry_points={
         'console_scripts': [
-            'tfdsbd-train=tfdsbd.train:main',
-            'tfdsbd-infer=tfdsbd.infer:main',
-            'tfdsbd-dataset=tfdsbd.dataset:main',
-            'tfdsbd-split=tfdsbd.split:main',
-            'tfdsbd-vocab=tfdsbd.vocab:main',
+            'tfdstbd-train=tfdstbd.train:main',
+            'tfdstbd-infer=tfdstbd.infer:main',
+            'tfdstbd-dataset=tfdstbd.dataset:main',
+            'tfdstbd-vocab=tfdstbd.vocab:main',
         ],
     },
     install_requires=[
@@ -33,6 +32,7 @@ setup(
         'tfscc3d>=1.0.0',
         'tfunicode>=1.4.4',
         'nlpvocab>=1.0.0',
+        'conllu>=1.2.1',
     ],
     test_suite='nose.collector',
     tests_require=['nose']

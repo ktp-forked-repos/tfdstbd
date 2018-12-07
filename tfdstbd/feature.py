@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -5,7 +6,7 @@ from __future__ import print_function
 import tensorflow as tf
 from tfunicode import expand_split_chars, expand_char_ngrams
 from tfunicode import transform_normalize_unicode, transform_wrap_with, transform_zero_digits
-from tfunicode import transform_lower_case, transform_title_case, transform_upper_case
+from tfunicode import transform_lower_case, transform_title_case, transform_upper_case, transform_string_replace
 
 _MAX_LENGTH = 15.
 
@@ -91,9 +92,11 @@ def extract_case_length_features(input_words):
 
 def extract_ngram_features(input_words, minn, maxn):
     input_words = transform_normalize_unicode(input_words, 'NFKC')
+    input_words = transform_string_replace(input_words, [  # accentuation
+        u'\u0060', u' \u0301', u'\u02CA', u'\u02CB', u'\u0300', u'\u0301'], [''] * 6)
     input_words = transform_lower_case(input_words)
     input_words = transform_zero_digits(input_words)
     input_words = transform_wrap_with(input_words, '<', '>')
-    char_ngrams = expand_char_ngrams(input_words, minn, maxn)
+    char_ngrams = expand_char_ngrams(input_words, minn, maxn, itself='ALONE')
 
     return char_ngrams

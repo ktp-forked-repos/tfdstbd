@@ -10,11 +10,7 @@ from tfunicode import expand_split_words
 from .feature import extract_case_length_features, extract_ngram_features
 
 
-def input_feature_columns(ngram_vocab, ngram_dimension, ngram_oov=1, ngram_combiner='sum', ngram_ckpt=None):
-    ngram_name = None
-    if ngram_ckpt is not None:
-        ngram_name = 'model/input_features/sequence_input_layer/ngrams_embedding/embedding_weights'
-
+def input_feature_columns(ngram_vocab, ngram_dimension, ngram_oov=1, ngram_combiner='sum'):
     ngram_categorial_column = sequence_categorical_column_with_vocabulary_list(
         key='ngrams',
         vocabulary_list=ngram_vocab,
@@ -25,8 +21,6 @@ def input_feature_columns(ngram_vocab, ngram_dimension, ngram_oov=1, ngram_combi
         categorical_column=ngram_categorial_column,
         dimension=ngram_dimension,
         combiner=ngram_combiner,
-        ckpt_to_load_from=ngram_ckpt,
-        tensor_name_in_ckpt=ngram_name
     )
 
     return [
@@ -41,12 +35,13 @@ def input_feature_columns(ngram_vocab, ngram_dimension, ngram_oov=1, ngram_combi
 
 
 def features_from_documens(documents, ngram_minn, ngram_maxn):
-    words = expand_split_words(documents)  # Transformation should be equal with train dataset tokenization
+    # Transformation should be equal with train dataset tokenization
+    words = expand_split_words(documents, extended=True)
     length, no_case, lower_case, upper_case, title_case, mixed_case = extract_case_length_features(words)
     ngrams = extract_ngram_features(words, ngram_minn, ngram_maxn)
 
     return {
-        'documents': documents,
+        'document': documents,
         'words': tf.sparse_tensor_to_dense(words, default_value=''),  # Required to pass in prediction
         'ngrams': ngrams,
         'word_length': length,
@@ -64,14 +59,19 @@ def train_input_fn(wild_card, batch_size, ngram_minn, ngram_maxn):
             examples_proto,
             features={
                 'document': tf.FixedLenFeature((), tf.string),
-                'labels': tf.FixedLenFeature((), tf.string),
+                'tokens': tf.FixedLenFeature((), tf.string),
+                'sentences': tf.FixedLenFeature((), tf.string),
             })
 
         features = features_from_documens(examples['document'], ngram_minn, ngram_maxn)
-        labels = tf.string_split(examples['labels'], delimiter=',')
-        labels = tf.sparse_tensor_to_dense(labels, default_value='B')
 
-        return features, labels
+        tokens = tf.string_split(examples['tokens'], delimiter=',')
+        tokens = tf.sparse_tensor_to_dense(tokens, default_value='B')
+
+        sentences = tf.string_split(examples['sentences'], delimiter=',')
+        sentences = tf.sparse_tensor_to_dense(sentences, default_value='B')
+
+        return features, {'tokens': tokens, 'sentences': sentences}
 
     with tf.name_scope('input'):
         files = tf.data.Dataset.list_files(wild_card)

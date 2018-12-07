@@ -1,5 +1,5 @@
 {
-  "ngram_minn": 3,
+  "ngram_minn": 2,
   "ngram_maxn": 5,
   "ngram_dimension": 20,
   "ngram_freq": 100,
